@@ -3,6 +3,11 @@
 import cv2
 import numpy as np
 import os
+import time
+
+from line_obj import lineobj
+from line_tools import *
+from display_data import *
 
 PATH = "../Logs/test_parcheggio/collections_exportate_csv/eagle_test/"
 
@@ -27,79 +32,45 @@ SUBFOLDER = dirs[30]+'/'  # 36 dirs
 # Here I should find all csv files
 
 
-def display_accel(image, line):
-
-    xcolor = (125, 0, 0)
-    ycolor = (0, 125, 0)
-
-    center = (
-        int(len(image[0])/2),
-        int(len(image[1])/2)
-    )
-
-    scl = 100
-
-    px = (
-        center[0],
-        int(center[1] + line[1]*scl)
-    )
-
-    py = (
-        int(center[0] + line[2]*scl),
-        center[1]
-    )
-
-    cv2.arrowedLine(image, center, px, xcolor, 1, cv2.LINE_AA)
-    cv2.arrowedLine(image, center, py, ycolor, 1, cv2.LINE_AA)
-
-    return image
-
-
 ''' OPENING FILES '''
 
 accel_file = open(PATH+SUBFOLDER+ACCEL_FILNAME, 'r')
-accel_lines = accel_file.readlines()
+accel_lines = accel_file.readlines()[1:]
 accel_iter = iter(accel_lines)
 
 gyro_file = open(PATH+SUBFOLDER+GYRO_FILNAME, 'r')
-gyro_lines = gyro_file.readlines()
+gyro_lines = gyro_file.readlines()[1:]
 gyro_iter = iter(gyro_lines)
 
-# ''' END OPENING '''
-
-# accel_line = [0, 0]
-# gyro_line = [0, 0]
-
-# accel_line[0] = next(accel_iter)
-# gyro_line[0] = next(gyro_iter)
-
-# while True:
-#     accel_line[1] = next(accel_iter)
-#     gyro_line[1] = next(gyro_iter)
+''' END OPENING '''
 
 
-prev_line = accel_lines[1]
-for i, line in enumerate(accel_lines[2:]):
-    spl = line.split('\t')
-    bff = []
-    for c in spl:
-        bff.append(float(c))
-    spl = bff
+''' CREATING OBJECTS '''
+accel = lineobj()
+gyro = lineobj()
 
-    if i == 0:
-        prev_line = spl
-        continue
+accel.current_line = parse_line(next(accel_iter))
+gyro.current_line = parse_line(next(gyro_iter))
 
-    print(prev_line)
-    print(spl)
+accel = next_line(accel_iter, accel)
+gyro = next_line(gyro_iter, gyro)
 
-    dt = spl[0] - prev_line[0]
+''' END CREATING '''
 
-    image = display_accel(BACKGROUND, spl)
-    cv2.imshow('datas', image)
 
-    print(int(dt))
-    cv2.waitKey(int(dt))
+while True:
 
-    BACKGROUND[:, :] = (50, 50, 50)
-    prev_line = spl
+    updated = False
+
+    if (check_if_to_update(accel, accel_iter)):
+        display_accel(BACKGROUND, accel.current_line)
+        updated = True
+
+    if (check_if_to_update(gyro, gyro_iter)):
+        display_gyro(BACKGROUND, gyro.current_line)
+        updated = True
+
+    if updated:
+        cv2.imshow('Log Data', BACKGROUND)
+        cv2.waitKey(1)
+        BACKGROUND[:, :] = (50, 50, 50)
