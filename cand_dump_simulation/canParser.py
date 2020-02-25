@@ -30,4 +30,10 @@ def fillCarData(message, data):
             data["gyro"]["x"] = ((message["payload"][1] * 256 + message["payload"][2])/10 - (message["payload"][7]) * 10)
             data["gyro"]["y"] = ((message["payload"][3] * 256 + message["payload"][4])/10 - (message["payload"][7]) * 10)
             data["gyro"]["z"] = ((message["payload"][5] * 256 + message["payload"][6])/10 - (message["payload"][7]) * 10)
+    if message["id"] == 208:
+        if message["payload"][0] == 6:
+            data["speed"] = (message["payload"][4] * 256 + message["payload"][5])*3.6 * -1 if message["payload"][3] == 1 else 1
+        if message["payload"][0] == 16:
+            data["GPS"]["speed"] = (message["payload"][6] * 256 + message["payload"][7])/100
+            print(data["GPS"])
     return data

@@ -40,10 +40,10 @@ def displayData(img, data, x, y, padding, textSize=0.7):
 
 def displayCar(data, W=1800, H=1800):
     image = np.zeros((H,W,3), np.uint8)
-    image[:,0:W] = (255,255,255)
+    image[:,:] = (255,255,255)
 
     image = displayAccelerations(image, data)
 
-    #image = displayData(image, data, 20, 20, 25)
+    image = displayData(image, data, 20, 20, 25)
 
     return image
