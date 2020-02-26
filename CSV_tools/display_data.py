@@ -1,7 +1,8 @@
 import cv2
 
 FONT = cv2.FONT_HERSHEY_DUPLEX
-FONT_SIZE = 0.4
+FONT_SIZE = 0.6
+SPAN = 20
 
 
 def display_accel(image, line):
@@ -26,8 +27,15 @@ def display_accel(image, line):
         center[1]
     )
 
+    point = (
+        int(center[0] + line[1]*scl),
+        int(center[1] + line[2]*scl)
+    )
+
     cv2.arrowedLine(image, center, px, xcolor, 2, cv2.LINE_AA)
     cv2.arrowedLine(image, center, py, ycolor, 2, cv2.LINE_AA)
+
+    cv2.ellipse(image, point, (4, 4), 0, 0, 0, xcolor, 2, cv2.LINE_AA)
 
     return image
 
@@ -81,7 +89,7 @@ def display_steer(image, line):
 def display_apps(image, line):
     center = (
         int(len(image[0])*4/5),
-        int(len(image[1])/5)-20
+        int(len(image[1])/5)-SPAN*2
     )
 
     tcolor = (255, 255, 255, 255)
@@ -95,7 +103,7 @@ def display_apps(image, line):
 def display_brake(image, line):
     center = (
         int(len(image[0])*4/5),
-        int(len(image[1])/5)-10
+        int(len(image[1])/5)-SPAN
     )
 
     tcolor = (255, 255, 255, 255)
