@@ -71,7 +71,8 @@ start_line = 10
 WIDTH = 700
 HEIGHT = 700
 BACKGROUND = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
-BACKGROUND[:, :] = (50, 50, 50, 255)  # BGR
+BACKGROUND_COLOR = (49, 48, 50, 200)
+BACKGROUND[:, :] = BACKGROUND_COLOR  # BGR
 TRANSPARENT = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 image_layers = []
 ''' END IMAGE '''
@@ -160,6 +161,7 @@ gyro = next_line(gyro_iter, gyro)
 enc = next_line(enc_iter, enc)
 steer = next_line(steer_iter, steer)
 apps = next_line(apps_iter, apps)
+brake = next_line(brake_iter, brake)
 gps = next_line(gps_iter, gps)
 
 video = next_frame(video, video_frames, video_timestamps)
@@ -267,7 +269,7 @@ while True:
     if updated:
 
         # clearing the background
-        BACKGROUND[:, :] = (50, 50, 50, 255)
+        BACKGROUND[:, :] = BACKGROUND_COLOR
 
         # adding all sensors image layers on top of background
         for layer in image_layers:

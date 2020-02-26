@@ -67,7 +67,6 @@ def next_line(iterator, obj):
 # nb respectively relative to start of program and relative to the start of log file
 def check_if_to_update(obj, iter_, global_time):
     if (global_time > (obj.current_timestamp - obj.timestamp_offset)/1000):
-
         for i in range(int(global_time / ((obj.current_timestamp - obj.timestamp_offset)/1000))):
             obj = next_line(iter_, obj)
             obj = get_delta_t(obj)
