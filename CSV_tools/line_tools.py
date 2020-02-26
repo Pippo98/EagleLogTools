@@ -3,10 +3,13 @@ import time
 from datetime import datetime
 
 
+# Setting the initial log file timestamp
 def set_offset_timestamp(obj):
     obj.timestamp_offset = int(obj.current_line[0])
 
 
+# Getting GPS timestamp from log file
+# NB this timestamp is the real timestamp of the log file
 def get_GPS_timestamp(line):
     timestamp = []
     for el in line[1:]:
@@ -23,6 +26,8 @@ def get_GPS_timestamp(line):
 
     return timestamp
 
+# Parsing line from string to float
+
 
 def parse_line(line):
     spl = line.split('\t')
@@ -32,6 +37,7 @@ def parse_line(line):
     return bff
 
 
+# getting delta time between log lines
 def get_delta_t(obj):
     buff = abs(obj.current_line[0] - obj.prev_line[0])/1000
 
@@ -41,6 +47,7 @@ def get_delta_t(obj):
     return obj
 
 
+# Reading next log file line
 def next_line(iterator, obj):
     obj.line_count += 1
 
@@ -55,10 +62,11 @@ def next_line(iterator, obj):
     return obj
 
 
+# check if is time to read next line in file log
+# comparison between current machine relative timestamp and log line relative timestamp
+# nb respectively relative to start of program and relative to the start of log file
 def check_if_to_update(obj, iter_, global_time):
     if (global_time > (obj.current_timestamp - obj.timestamp_offset)/1000):
-
-        #print(global_time, (obj.current_timestamp - obj.timestamp_offset)/1000)
 
         for i in range(int(global_time / ((obj.current_timestamp - obj.timestamp_offset)/1000))):
             obj = next_line(iter_, obj)
@@ -68,6 +76,7 @@ def check_if_to_update(obj, iter_, global_time):
         False
 
 
+# uploading next frame
 def next_frame(obj, frame_iter, timestamp_iter):
     obj.prev_frame = obj.current_frame
     obj.prev_timestamp = obj.current_timestamp
@@ -86,9 +95,9 @@ def next_frame(obj, frame_iter, timestamp_iter):
     return obj
 
 
+# check if is time to load new frame
+# comparison between current timestamp and video timestamp
 def check_video_frame_update(obj, frame_iter, timestamp_iter, global_time):
-
-    #print(global_time, (obj.current_timestamp - obj.video_time_offset)/1000)
 
     if (global_time > (obj.current_timestamp - obj.video_time_offset)/1000):
         for i in range(int(global_time / ((obj.current_timestamp - obj.video_time_offset)/1000))):
@@ -98,6 +107,7 @@ def check_video_frame_update(obj, frame_iter, timestamp_iter, global_time):
         False
 
 
+# getting the file modification time
 def get_datetime_fame(path):
     tim = os.path.getmtime(path)
     return datetime.fromtimestamp(tim)

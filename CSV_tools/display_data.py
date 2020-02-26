@@ -15,6 +15,8 @@ def display_accel(image, line):
         int(len(image[1])/2)
     )
 
+    line[1] = -line[1]
+
     scl = 200
 
     px = (
