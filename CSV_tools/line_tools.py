@@ -49,7 +49,6 @@ def get_delta_t(obj):
 
 # Reading next log file line
 def next_line(iterator, obj):
-    obj.line_count += 1
 
     obj.prev_line = obj.current_line
 
@@ -88,8 +87,6 @@ def next_frame(obj, frame_iter, timestamp_iter):
     obj.current_time = time.time()
 
     obj.dt = (obj.current_timestamp - obj.prev_timestamp)/1000
-
-    obj.frame_count += 1
 
     return obj
 

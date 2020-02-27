@@ -8,8 +8,6 @@ class lineobj(object):
     current_timestamp = 0
     prev_timestamp = 0
 
-    line_count = 1
-
 
 class videoobj(object):
     current_frame = ""
@@ -23,7 +21,5 @@ class videoobj(object):
 
     current_timestamp = 0
     prev_timestamp = 0
-
-    frame_count = 1
 
     video_time_offset = 0

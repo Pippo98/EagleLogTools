@@ -37,6 +37,8 @@ VIDEO_END_TIMESTAMP = os.path.getmtime(
 VIDEO_DURATION = VIDEO_END_TIMESTAMP - VIDEO_START_TIMESTAMP
 
 # reading video frames and relative timestamp saved in txt file
+first_frame = ideo_frame = cv2.imread(
+    VIDEO_FRAME_PATH+video_frames[0], 1)
 video_frames = iter(video_frames)
 
 video_timestamps = open(VIDEO_TIMESTAMP_PATH, 'r').readlines()[1:]
@@ -70,6 +72,9 @@ start_line = 10
 # creating background image to display data onto it
 WIDTH = 700
 HEIGHT = 700
+if ENABLE_VIDEO:
+    HEIGHT = len(first_frame)
+    WIDTH = len(first_frame[0])
 BACKGROUND = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 BACKGROUND_COLOR = (49, 48, 50, 200)
 BACKGROUND[:, :] = BACKGROUND_COLOR  # BGR
@@ -271,16 +276,18 @@ while True:
         # clearing the background
         BACKGROUND[:, :] = BACKGROUND_COLOR
 
-        # adding all sensors image layers on top of background
-        for layer in image_layers:
-            idxs = layer[:, :, 3] > 0
-            BACKGROUND[idxs] = layer[idxs]
-
         # if log has video dispay it
         if ENABLE_VIDEO and VIDEO_STARTED:
             video_frame = cv2.imread(
                 VIDEO_FRAME_PATH+video.current_frame, 1)
-            cv2.imshow('VIDEO', video_frame)
+            rgba = cv2.cvtColor(video_frame, cv2.COLOR_RGB2RGBA)
+            BACKGROUND = rgba
+            #cv2.imshow('VIDEO', video_frame)
+
+        # adding all sensors image layers on top of background
+        for layer in image_layers:
+            idxs = layer[:, :, 3] > 0
+            BACKGROUND[idxs] = layer[idxs]
 
         cv2.imshow('Log Data', BACKGROUND)
         cv2.waitKey(1)

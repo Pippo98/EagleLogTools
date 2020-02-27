@@ -5,7 +5,9 @@ FONT = cv2.FONT_HERSHEY_DUPLEX
 FONT_SIZE = 0.6
 SPAN = 40
 
-pedal_size = (10, 30)
+pedal_size = (20, 40)
+
+steer_wheel_size = (200, 100)
 
 
 def draw_rectangle(image, centre, theta, width, height, color):
@@ -46,13 +48,13 @@ def display_accel(image, line):
     max_accel = int(line[4])
 
     center = (
-        int(len(image[0])/5),
-        int(len(image[1])/5)
+        int(len(image[0])*3/10),
+        int(len(image[1])/2)
     )
 
     line[1] = -line[1]
 
-    scl = 40
+    scl = 35
 
     point = (
         int(center[0] + line[1]*scl),
@@ -70,14 +72,16 @@ def display_accel(image, line):
 
 def display_gyro(image, line):
 
+    line[1] = -line[1]
+
     zcolor = (0, 0, 225, 255)
 
     center = (
-        int(len(image[0])/2),
+        int(len(image[0])*7/10),
         int(len(image[1])/2)
     )
 
-    radius = 100
+    radius = 50
 
     cv2.ellipse(image, center, (radius, radius), -90,
                 0, line[3], zcolor, 2)
@@ -92,13 +96,13 @@ def display_enc(image, line):
 
     center = (
         int(len(image[0])/2 - textsize/2),
-        int(len(image[1])/10)
+        int(len(image[1])/20)
     )
 
     tcolor = (255, 255, 255, 255)
 
     cv2.putText(image, text, center,
-                FONT, FONT_SIZE*2, tcolor, 1, cv2.LINE_AA)
+                FONT, FONT_SIZE*1.4, tcolor, 1, cv2.LINE_AA)
 
     return image
 
@@ -112,12 +116,13 @@ def display_steer(image, line):
 
     center = (
         int(len(image[0])/2),
-        int(len(image[1])/2)
+        int(len(image[1])/5)
     )
 
     tcolor = (255, 255, 255, 255)
 
-    image = draw_rectangle(image, center, line[1]*-1, 200, 100, tcolor)
+    image = draw_rectangle(
+        image, center, line[1]*-1, steer_wheel_size[0], steer_wheel_size[1], tcolor)
 
     cv2.putText(image, text, (int(center[0] - textsize[0]/4), int(center[1] + textsize[1]/4)),
                 FONT, FONT_SIZE, tcolor, 1, cv2.LINE_AA)
@@ -127,25 +132,22 @@ def display_steer(image, line):
 
 def display_apps(image, line):
     center = (
-        int(len(image[0])/2),
-        int(len(image[1])*1.5/6)
+        int(len(image[0])/2 + steer_wheel_size[0]*1.4/2),
+        int(len(image[1])/5)
     )
 
     tcolor = (255, 255, 255, 255)
     rectColor = (0, 255, 0, 255)
 
-    p1 = (center[0]-pedal_size[0]-10, int(center[1]))
-    p2 = (center[0]-10, int(center[1]-pedal_size[1]))
+    p1 = (center[0]-pedal_size[0], int(center[1]))
+    p2 = (center[0], int(center[1]-pedal_size[1]))
     cv2.rectangle(image, p1, p2, rectColor, 1, cv2.LINE_AA)
 
-    p1 = (center[0]-pedal_size[0]-10,
+    p1 = (center[0]-pedal_size[0],
           int((center[1])))
-    p2 = (center[0]-10,
+    p2 = (center[0],
           int((center[1]-(pedal_size[1]*line[1]/100))))
     cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
-
-    cv2.putText(image, "apps: "+str(int(line[1]))+"%", center,
-                FONT, FONT_SIZE, tcolor, 1, cv2.LINE_AA)
 
     return image
 
@@ -153,21 +155,21 @@ def display_apps(image, line):
 def display_brake(image, line):
 
     center = (
-        int(len(image[0])/2),
-        int(len(image[1])*1.5/6)+SPAN
+        int(len(image[0])/2 - steer_wheel_size[0]*1.4/2),
+        int(len(image[1])/5)
     )
 
     tcolor = (255, 255, 255, 255)
     rectColor = (0, 0, 255, 255)
 
-    p1 = (center[0]-pedal_size[0]-10, int(center[1]))
-    p2 = (center[0]-10, int(center[1]-pedal_size[1]))
+    p1 = (center[0]-pedal_size[0], int(center[1]))
+    p2 = (center[0], int(center[1]-pedal_size[1]))
     cv2.rectangle(image, p1, p2, rectColor, 1, cv2.LINE_AA)
 
     if (line[1] > 1):
         cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
 
-    cv2.putText(image, "brake: "+str(int(line[1])), center,
-                FONT, FONT_SIZE, tcolor, 1, cv2.LINE_AA)
+    # cv2.putText(image, "brake: "+str(int(line[1])), center,
+    #             FONT, FONT_SIZE, tcolor, 1, cv2.LINE_AA)
 
     return image
