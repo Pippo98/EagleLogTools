@@ -8,6 +8,19 @@ def set_offset_timestamp(obj):
     obj.timestamp_offset = int(obj.current_line[0])
 
 
+def get_timestamp_w_millis(line):
+    if type(line[0]) == str:
+        line[0] = int(line[0])
+
+    trunc_timestamp = int(float(line[0])/1000)
+    timestamp = datetime.fromtimestamp(trunc_timestamp)
+    millis = line[0]/1000 - trunc_timestamp
+    millis = millis.__round__(3)
+    millis = str(millis).split('.')[1]
+    date = str(timestamp)+"."+millis
+    return date
+
+
 # Getting GPS timestamp from log file
 # NB this timestamp is the real timestamp of the log file
 def get_GPS_timestamp(line):
@@ -107,3 +120,13 @@ def check_video_frame_update(obj, frame_iter, timestamp_iter, global_time):
 def get_datetime_fame(path):
     tim = os.path.getmtime(path)
     return datetime.fromtimestamp(tim)
+
+
+def get_video_duration(start_timestamp, end_timestamp):
+    seconds = end_timestamp - start_timestamp
+    duration = []
+    duration.append(str(int(seconds/3600)))
+    duration.append(str(int(seconds/60)))
+    duration.append(str(int(seconds % 60)))
+    duration = ':'.join(duration)
+    return duration

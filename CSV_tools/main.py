@@ -6,6 +6,8 @@ import os
 import time
 import datetime
 from dateutil.parser import parse
+from scipy.signal import lfilter
+
 
 from line_obj import lineobj, videoobj
 from line_tools import *
@@ -15,11 +17,17 @@ START_FROM_SEC = 31
 
 ENABLE_VIDEO = True
 VIDEO_STARTED = False
+DEBUG = True
+Pause = False
 
 PATH = "../Logs/test_parcheggio/collections_exportate_csv/eagle_test/"
 
 VIDEO_FRAME_PATH = "../t2/Camera_frames/Left/"
 VIDEO_TIMESTAMP_PATH = "../t2/timestamp_depth.txt"
+
+filter_n = 15  # the larger n is, the smoother curve will be
+filter_b = [1.0 / filter_n] * filter_n
+filter_a = 1
 
 
 ''' SORTING FRAMES '''
@@ -34,11 +42,10 @@ VIDEO_END_TIMESTAMP = os.path.getmtime(
     VIDEO_FRAME_PATH+video_frames[len(video_frames)-1])
 
 # calculating video duration
-VIDEO_DURATION = VIDEO_END_TIMESTAMP - VIDEO_START_TIMESTAMP
+VIDEO_DURATION = get_video_duration(VIDEO_START_TIMESTAMP, VIDEO_END_TIMESTAMP)
 
 # reading video frames and relative timestamp saved in txt file
-first_frame = ideo_frame = cv2.imread(
-    VIDEO_FRAME_PATH+video_frames[0], 1)
+first_frame = ideo_frame = cv2.imread(VIDEO_FRAME_PATH+video_frames[0], 1)
 video_frames = iter(video_frames)
 
 video_timestamps = open(VIDEO_TIMESTAMP_PATH, 'r').readlines()[1:]
@@ -113,16 +120,9 @@ apps_iter = iter(apps_lines)
 
 gps_file = open(PATH+SUBFOLDER+GPS_TIME_FILNAME, 'r')
 gps_lines = gps_file.readlines()[start_line:]
-
-file_time = int(gps_lines[len(gps_lines)-1].split('\t')
-                [0]) - int(gps_lines[2].split('\t')[0])
-
-print("file time: {}".format(file_time))
-
 gps_iter = iter(gps_lines)
 
 gps_timestamp_offset = int(gps_lines[0].split('\t')[0])
-
 ''' END OPENING '''
 
 
@@ -170,32 +170,38 @@ brake = next_line(brake_iter, brake)
 gps = next_line(gps_iter, gps)
 
 video = next_frame(video, video_frames, video_timestamps)
-#video = next_frame(video, video_frames, video_timestamps)
+# video = next_frame(video, video_frames, video_timestamps)
 
 ''' END CREATING '''
 
 image_layers = [TRANSPARENT, TRANSPARENT, TRANSPARENT,
                 TRANSPARENT, TRANSPARENT, TRANSPARENT, TRANSPARENT]
 
-
-''' SYNCRONYZE FRAMES '''
+''' SYNCRONIZE FRAMES '''
 
 gps_timestamp = get_GPS_timestamp(gps.current_line)
+
+log_timestamp = datetime.fromtimestamp(int(float(accel.timestamp_offset)/1000))
+
 vid_time = datetime.fromtimestamp(VIDEO_START_TIMESTAMP)
 
 gps_timestamp = gps_timestamp.replace(year=vid_time.year,
                                       month=vid_time.month, day=vid_time.day)
 
-print(str(gps_timestamp))
+log_duration = get_video_duration(int(gps_lines[2].split('\t')[0])/1000, int(gps_lines[len(gps_lines)-1].split('\t')
+                                                                             [0])/1000)
 
-
-print(vid_time)
-print(VIDEO_DURATION)
+print("#"*100)
+print("Log start time: {}".format(log_timestamp))
+print("Log Duration: {}".format(log_duration))
+print("Video start time: {}".format(vid_time))
+print("Video Duration: {}".format(VIDEO_DURATION))
+print("#"*100)
 
 # Reading frames before log file started
-if max((gps_timestamp, vid_time)) == gps_timestamp:
+if max((log_timestamp, vid_time)) == gps_timestamp:
     ''' VIDEO STARTED BEFORE DATA LOG '''
-    while(gps_timestamp >= vid_time):
+    while(log_timestamp >= vid_time):
         next_frame(video, video_frames, video_timestamps)
         vid_time = os.path.getmtime(VIDEO_FRAME_PATH+video.current_frame)
         vid_time = datetime.fromtimestamp(vid_time)
@@ -206,8 +212,13 @@ else:
 
 time0 = time.time() - START_FROM_SEC
 
+debug_timer = time0
+pause_time = 0
 while True:
-    GLOBAL_TIME = time.time() - time0
+    if not Pause:
+        GLOBAL_TIME = time.time() - time0 - pause_time
+    else:
+        pause_time = time.time() - time0 - GLOBAL_TIME
 
     updated = False
 
@@ -223,6 +234,8 @@ while True:
         image_layers[1] = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
         image_layers[1] = display_gyro(image_layers[1], gyro.current_line)
         updated = True
+
+    # print("gyro: {} enc: {}, apps: {}".format(gyro.dt, enc.dt, apps.dt))
 
     ''' ENC '''
     if check_if_to_update(enc, enc_iter, GLOBAL_TIME):
@@ -262,12 +275,17 @@ while True:
 
         VIDEO_STARTED = True
 
-    print(get_datetime_fame(VIDEO_FRAME_PATH +
-                            video.current_frame), gps_timestamp)
+    # print(get_datetime_fame(VIDEO_FRAME_PATH +
+    #                         video.current_frame), gps_timestamp)
 
     # checking if is time to display new frame
     if ENABLE_VIDEO and VIDEO_STARTED and check_video_frame_update(video, video_frames, video_timestamps, GLOBAL_TIME):
         updated = True
+
+    if time.time() - debug_timer > 0.5:
+        print("video time: {} log time: {}".format(get_datetime_fame(
+            VIDEO_FRAME_PATH + video.current_frame), gps_timestamp), end="\r")
+        debug_timer = time.time()
 
     ''' END VIDEO '''
 
@@ -282,7 +300,7 @@ while True:
                 VIDEO_FRAME_PATH+video.current_frame, 1)
             rgba = cv2.cvtColor(video_frame, cv2.COLOR_RGB2RGBA)
             BACKGROUND = rgba
-            #cv2.imshow('VIDEO', video_frame)
+            # cv2.imshow('VIDEO', video_frame)
 
         # adding all sensors image layers on top of background
         for layer in image_layers:
@@ -290,4 +308,10 @@ while True:
             BACKGROUND[idxs] = layer[idxs]
 
         cv2.imshow('Log Data', BACKGROUND)
-        cv2.waitKey(1)
+
+    key = cv2.waitKey(1)
+    if key == 27:  # EXIT
+        print("\n")
+        exit(0)
+    if key == 32:  # SPACEBAR
+        Pause = not Pause
