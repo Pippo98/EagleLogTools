@@ -1,11 +1,11 @@
-#!/urs/bin/env python1
+##!/urs/bin/env python3
 
 import serial
 import serial.tools.list_ports as lst
 import time
 from termcolor import colored, cprint
 
-LOG_FILE_MODE = True
+LOG_FILE_MODE = False
 filename = "/home/filippo/Desktop/logFile_1.txt"
 
 info = lst.comports()
@@ -82,7 +82,6 @@ if __name__ == "__main__":
             while time.time() - start_time < analisys_duration:
                 msg = str(ser.readline(), 'ascii')
                 msg = parse_message(msg)
-                print(msg)
                 message_list = message_counter(message_list, msg)
         else:
             line = lines.pop()
