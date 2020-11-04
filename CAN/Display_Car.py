@@ -111,27 +111,36 @@ def rounded_rectangle(src, top_left, bottom_right, radius=1, color=255, thicknes
     return src
 
 
-def display_accel(image, accel):
+def display_accel(image, type, accel):
     pointcolor = (0, 0, 255, 255)
     white = (255, 255, 255, 255)
 
     max_accel = int(accel.scale)
-
-    center = (
-        int(len(image[0])*3/10),
-        int(len(image[1])/2)
-    )
+    if type == 1:
+        center = (
+            int(len(image[0])*3/20),
+            int(len(image[1])/2)
+        )
+        scl = 35
+    else:
+        center = (
+            int(len(image[0])*8/20),
+            int(len(image[1])/2)
+        )
+        scl = 15
 
     x = -accel.x
-
-    scl = 35
 
     point = (
         int(center[0] + x*scl),
         int(center[1] + accel.y*scl)
     )
 
-    cv2.ellipse(image, point, (3, 3), 0, 0, 359, pointcolor, 3, cv2.LINE_AA)
+    try:
+        cv2.ellipse(image, point, (3, 3), 0, 0,
+                    360, pointcolor, 3, cv2.LINE_AA)
+    except:
+        pass
 
     for i in range(1, max_accel):
         cv2.ellipse(image, center, (int(i*scl),
@@ -140,27 +149,36 @@ def display_accel(image, accel):
     return image
 
 
-def display_gyro(image, gyro):
+def display_gyro(image, type, gyro):
 
-    x = -gyro.x
+    x = -gyro.z
 
-    zcolor = (0, 0, 225, 255)
+    zcolor = (255, 0, 225, 255)
 
-    center = (
-        int(len(image[0])*7/10),
-        int(len(image[1])/2)
-    )
+    if type == 1:
+        center = (
+            int(len(image[0])*3/20),
+            int(len(image[1])/2)
+        )
+    else:
+        center = (
+            int(len(image[0])*8/20),
+            int(len(image[1])/2)
+        )
 
-    radius = 50
+    radius = 130
 
-    cv2.ellipse(image, center, (radius, radius), -90,
-                0, gyro.z, zcolor, 2)
+    try:
+        cv2.ellipse(image, center, (radius, radius), -90,
+                    0, x, zcolor, 2)
+    except:
+        pass
     return image
 
 
 def display_enc(image, enc):
 
-    text = str(int(enc.l_enc))+" Km/h"
+    text = str(int(enc.l_kmh))+" Km/h"
 
     textsize = cv2.getTextSize(text, FONT, 1, 2)[0][0]
 
@@ -192,8 +210,11 @@ def display_enc(image, enc):
     cv2.ellipse(image, circleCenter, (radius, radius), -90,
                 0, 360, zcolor, 2)
 
-    cv2.ellipse(image, circleCenter, (radius, radius), 0,
-                -a0, -a1, xcolor, 2)
+    pointCenter = (
+        int(circleCenter[0] + radius * math.cos(enc.angle1)),
+        int(circleCenter[1] + radius * math.sin(enc.angle1)),
+    )
+    cv2.circle(image, pointCenter, 5, xcolor, -1)
 
     xcolor = (255, 0, 225, 255)
     radius = 130
@@ -247,6 +268,18 @@ def display_apps(image, pedals):
 
     cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
 
+    txt = str(pedals.throttle1)
+
+    textsize = cv2.getTextSize(txt, FONT, 1, 2)[0]
+
+    center = (
+        int(center[0]),
+        center[1],
+    )
+
+    cv2.putText(image, txt, center,
+                FONT, FONT_SIZE*1, rectColor, 1, cv2.LINE_AA)
+
     return image
 
 
@@ -264,7 +297,7 @@ def display_brake(image, brake):
     p2 = (center[0], int(center[1]-pedal_size[1]))
     cv2.rectangle(image, p1, p2, rectColor, 1, cv2.LINE_AA)
 
-    if (brake.brake > 1):
+    if (brake.brake > 0):
         cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
 
     # cv2.putText(image, "brake: "+str(int(line[1])), center,
@@ -433,7 +466,7 @@ def display_inverter(image, speedl, speedr, torquel, torquer):
     line_span = 20
 
     # INVERTER LEFT
-    text = str(int(speedl))+" Km/h"
+    text = str(round(speedl, 2))+" Km/h"
 
     textsize = cv2.getTextSize(text, FONT, 1, 2)[0][0]
 
@@ -447,7 +480,7 @@ def display_inverter(image, speedl, speedr, torquel, torquer):
     cv2.putText(image, text, center,
                 FONT, FONT_SIZE*1.4, tcolor, 1, cv2.LINE_AA)
 
-    text = str(int(torquel))+" Nm"
+    text = str(round(torquel, 2))+" Nm"
 
     textsize = cv2.getTextSize(text, FONT, 1, 2)[0]
 
@@ -463,7 +496,7 @@ def display_inverter(image, speedl, speedr, torquel, torquer):
 
     # INVERTER RIGHT
 
-    text = str(int(speedr))+" Km/h"
+    text = str(round(speedr, 2))+" Km/h"
 
     textsize = cv2.getTextSize(text, FONT, 1, 2)[0][0]
 
@@ -477,7 +510,7 @@ def display_inverter(image, speedl, speedr, torquel, torquer):
     cv2.putText(image, text, center,
                 FONT, FONT_SIZE*1.4, tcolor, 1, cv2.LINE_AA)
 
-    text = str(int(torquer))+" Nm"
+    text = str(round(torquer, 2))+" Nm"
 
     textsize = cv2.getTextSize(text, FONT, 1, 2)[0]
 

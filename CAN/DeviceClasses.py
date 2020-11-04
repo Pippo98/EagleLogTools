@@ -7,6 +7,7 @@ class Accel_Gyro:
     scale = 0
     time = 0
     count = 0
+    file_ = ""
 
     def __init__(self):
         pass
@@ -30,31 +31,41 @@ class Accel_Gyro:
 class Speed:
 
     type = "Speed"
-    l_enc = 0
-    r_enc = 0
+    l_kmh = 0
+    r_kmh = 0
+    l_rads = 0
+    r_rads = 0
     angle0 = 0
     angle1 = 0
     delta = 0
+    frequency = 0
     time = 0
     count = 0
+    file_ = ""
 
     def __init__(self):
         pass
 
     def get_obj(self):
         obj = [
-            self.l_enc,
-            self.r_enc,
+            self.l_kmh,
+            self.r_kmh,
+            self.l_rads,
+            self.r_rads,
             self.angle0,
             self.angle1,
             self.delta,
+            self.frequency
         ]
         names = [
             "left",
             "right",
+            "Rad/s Left",
+            "Rad/s Right",
             "angle0",
             "angle1",
             "delta",
+            "frequency"
         ]
         return obj, names
 
@@ -65,6 +76,7 @@ class Steer:
     angle = 0
     time = 0
     count = 0
+    file_ = ""
 
     def __init__(self):
         pass
@@ -87,6 +99,7 @@ class Pedals:
     brake = 0
     time = 0
     count = 0
+    file_ = ""
 
     def __init__(self):
         pass
@@ -114,6 +127,7 @@ class ECU:
 
     time = 0
     count = 0
+    file_ = ""
 
     def __init__(self):
         pass
@@ -140,6 +154,7 @@ class SteeringWheel:
 
     time = 0
     count = 0
+    file_ = ""
 
     def __init__(self):
         pass
@@ -161,12 +176,13 @@ class Commands:
 
     time = 0
     count = 0
+    file_ = ""
 
     def __init__(self):
         pass
 
     def get_obj(self):
-        return self.active_commands
+        return self.active_commands, "none"
 
     def remove_command(self):
         self.active_commands.pop(0)
@@ -186,6 +202,7 @@ class Inverter:
 
     count = 0
     time = 0
+    file_ = ""
 
     def __init__(self):
         pass
@@ -218,6 +235,7 @@ class BMS:
 
     count = 0
     time = 0
+    file_ = ""
 
     def __init__(self):
         pass
