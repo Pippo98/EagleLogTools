@@ -21,9 +21,14 @@ ENABLE_VIDEO = False
 # creating background image to display data onto it
 WIDTH = 1000
 HEIGHT = 700
+movie = 0
 if ENABLE_VIDEO:
+    movie = cv2.VideoCapture(0)
+    ret, first_frame = movie.read()
     HEIGHT = len(first_frame)
     WIDTH = len(first_frame[0])
+
+
 BACKGROUND = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 BACKGROUND_COLOR = (49, 48, 50, 200)
 BACKGROUND[:, :] = BACKGROUND_COLOR  # BGR
@@ -32,6 +37,13 @@ TRANSPARENT = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 imageToDisplay = []
 newImage = False
 lastImage = BACKGROUND
+
+
+framerate = 30
+
+if(ENABLE_VIDEO):
+    framerate = movie.get(cv2.CAP_PROP_FPS)
+
 ''' END IMAGE '''
 
 span = 7
@@ -43,7 +55,7 @@ to_clear = False
 prev_line_count = 0
 to_print_lines = []
 tot_msg = 0
-analisys_duration = 1
+analysis_duration = 1
 
 a = DeviceClasses.Accel_Gyro()
 g = DeviceClasses.Accel_Gyro()
@@ -92,26 +104,32 @@ image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 
 LOG_FILE_MODE = True
 TELEMETRY_LOG = False
-VOLANTE_DUMP = False
-CREATE_CSV = True
+VOLANTE_DUMP = True
+CREATE_CSV = False
 START_LINE = 2
 SPEED_UP = 5
 # filename = "/home/filippo/Desktop/logFile_1.txt"
 # filename = "/media/filippo/label/Codes/Github/EagleLogTools/Logs/TEST_VADENA/volante_dump/4-5/5.log"
 # filename = "/home/filippo/Desktop/20HzSensors.log"
 # filename = "/home/filippo/Desktop/InitialStatus.log"
-filename = "/home/filippo/Desktop/newECU-20Hz.log"
+# filename = "/home/filippo/Desktop/newECU-20Hz.log"
+filename = "/home/filippo/Desktop/newlogs/candump/0.log"
 # filename = "/home/filippo/Desktop/newlogs/2020-11-3_20_3_15/eagle_test/temp.temp"
 
 
 # create a csv file for each sensor with all values parsed
 if(CREATE_CSV):
-    pathcsv = "/home/filippo/Desktop/newlogs/2020-11-3_20_3_15/eagle_test/csv"
+    if(not LOG_FILE_MODE):
+        pathcsv = "/home/filippo/Desktop/defaultRealTimeCSV/"
+    else:
+        if(TELEMETRY_LOG):
+            pathcsv = "/home/filippo/Desktop/newlogs/2020-11-3_20_3_15/eagle_test/csv"
+        else:
+            pathcsv = "/home/filippo/Desktop/defaultCSV/"
     if(not os.path.isdir(pathcsv)):
         os.mkdir(pathcsv)
     for sensor in sensors:
         sensor.file_ = open(pathcsv + "/" + sensor.type + ".csv", "w")
-        print(sensor)
         obj, names = sensor.get_obj()
         csvDescriptorLine = "timestamp" + ";" + ";".join(names) + "\n"
         sensor.file_.write(csvDescriptorLine)
@@ -193,21 +211,30 @@ def parse_message(msg):
 
 
 def fill_structs(timestamp, id, msg):
+
+    if(LOG_FILE_MODE and VOLANTE_DUMP):
+        time_ = timestamp
+    else:
+        time_ = time.time()
     modifiedSensors = []
 
     if(id == 0xB0):
         # PEDALS
-        if(msg[0] == 1):
+        if(msg[0] == 0x01):
             pedals.throttle1 = msg[1]
             pedals.throttle2 = msg[2]
             pedals.time = time.time()
             pedals.count += 1
             modifiedSensors.append(pedals.type)
+            pedals.time = time_
         if(msg[0] == 0x02):
             pedals.brake = msg[1]
+            pedals.front = (msg[2] * 256 + msg[4]) / 500
+            pedals.back = (msg[5] * 256 + msg[7]) / 500
             pedals.time = time.time()
             pedals.count += 1
             modifiedSensors.append(pedals.type)
+            pedals.time = time_
 
     if(id == 0x4ED):
         a2.scale = 8
@@ -230,7 +257,7 @@ def fill_structs(timestamp, id, msg):
         a2.y = round(a2.y, 2)
         a2.z = round(a2.z, 2)
 
-        a2.time = time.time()
+        a2.time = time_
         a2.count += 1
         modifiedSensors.append(a2.type)
 
@@ -255,7 +282,7 @@ def fill_structs(timestamp, id, msg):
         g2.y = round(g2.y, 2)
         g2.z = round(g2.z, 2)
 
-        g2.time = time.time()
+        g2.time = time_
         g2.count += 1
         modifiedSensors.append(g2.type)
 
@@ -271,7 +298,7 @@ def fill_structs(timestamp, id, msg):
             a.y = round(a.y, 3)
             a.z = round(a.z, 3)
 
-            a.time = time.time()
+            a.time = time_
             a.count += 1
             modifiedSensors.append(a.type)
         # GYRO
@@ -285,14 +312,14 @@ def fill_structs(timestamp, id, msg):
             g.y = round(g.y, 3)
             g.z = round(g.z, 3)
 
-            g.time = time.time()
+            g.time = time_
             g.count += 1
             modifiedSensors.append(g.type)
 
         # STEER
         if(msg[0] == 2):
             steer.angle = msg[1]
-            steer.time = time.time()
+            steer.time = time_
             steer.count += 1
             modifiedSensors.append(steer.type)
 
@@ -300,7 +327,7 @@ def fill_structs(timestamp, id, msg):
         # SPEED
         if(msg[0] == 6):
             speed.l_enc = msg[1] * 256 + msg[2]
-            speed.time = time.time()
+            speed.time = time_
             speed.count += 1
             modifiedSensors.append(speed.type)
 
@@ -309,7 +336,7 @@ def fill_structs(timestamp, id, msg):
             if msg[7] == 1:
                 speed.l_rads *= -1
 
-            speed.time = time.time()
+            speed.time = time_
             speed.count += 1
             modifiedSensors.append(speed.type)
 
@@ -319,6 +346,7 @@ def fill_structs(timestamp, id, msg):
             speed.delta = (msg[5] * 256 + msg[6]) / 100
             speed.frequency = msg[7]
             speed.count += 1
+            speed.time = time_
             modifiedSensors.append(speed.type)
 
     # ECU
@@ -326,15 +354,16 @@ def fill_structs(timestamp, id, msg):
         # ECU State
         if(msg[0] == 0x10):
             ecu.state = msg[1]
+            modifiedSensors.append(ecu.type)
 
         # ECU bms on request
         if(msg[0] == 0x0A):
             cmds.active_commands.append(
                 ("ECU BMS ON request", time.time())
             )
+            modifiedSensors.append(cmds.type)
 
         ecu.count += 1
-        modifiedSensors.append(ecu.type)
 
     # STEERING
     if(id == 0xA0):
@@ -363,6 +392,7 @@ def fill_structs(timestamp, id, msg):
                 ecu.map = msg[1]
 
         steeringWheel.count += 1
+        steeringWheel.time = time_
         modifiedSensors.append(steeringWheel.type)
 
     if(id == 0x201):
@@ -383,9 +413,11 @@ def fill_structs(timestamp, id, msg):
     if(id == 0xAA):
         if(msg[0] == 0x01):
             bmsHV.voltage = ((msg[1] << 16) + (msg[2] << 8))/10000
+            bmsHV.time = time_
             modifiedSensors.append(bmsHV.type)
         if(msg[0] == 0x05):
             bmsHV.current = (msg[1] * 256 + msg[2])/10
+            bmsHV.time = time_
             modifiedSensors.append(bmsHV.type)
 
         if(msg[0] == 0x03):
@@ -410,6 +442,7 @@ def fill_structs(timestamp, id, msg):
         bmsLV.voltage = msg[0]/10
         bmsLV.temp = msg[2]/5
         bmsLV.count += 1
+        bmsLV.time = time_
         modifiedSensors.append(bmsLV.type)
 
     # INVERTER LEFT
@@ -418,14 +451,18 @@ def fill_structs(timestamp, id, msg):
             invl.torque = (msg[2] * 256 + msg[1]) / 218.446666667
             if(invl.torque > 150):
                 invl.torque -= 300
+            invl.time = time_
         if(msg[0] == 0x4A):
             invl.temp = (msg[2] * 256 + msg[1] - 15797) / 112.1182
+            invl.time = time_
         if(msg[0] == 0x49):
             invl.motorTemp = (msg[2] * 256 + msg[1] - 9393.9) / 55.1
+            invl.time = time_
         if(msg[0] == 0xA8):
             invl.speed = (msg[2] * 256 + msg[1]) / \
                 9.112932605  # rmp 549 -> num 5003
             invl.speed = ((invl.speed/(60))*0.395)*3.6
+            invl.time = time_
 
         invl.torque = round(invl.torque, 3)
         invl.temp = round(invl.temp, 3)
@@ -441,13 +478,17 @@ def fill_structs(timestamp, id, msg):
             invr.torque = (msg[2] * 256 + msg[1]) / 218.446666667
             if(invr.torque > 150):
                 invr.torque -= 300
+            invr.time = time_
         if(msg[0] == 0x4A):
             invr.temp = (msg[2] * 256 + msg[1] - 15797) / 112.1182
+            invr.time = time_
         if(msg[0] == 0x49):
             invr.motorTemp = (msg[2] * 256 + msg[1] - 9393.9) / 55.1
+            invr.time = time_
         if(msg[0] == 0xA8):
             invr.speed = (msg[2] * 256 + msg[1]) / 9.112932605
             invr.speed = ((invr.speed/(60))*0.395)*3.6
+            invr.time = time_
             '''
             invr.speed = (msg[2] * 256 + msg[1])
             if(invr.speed > 32768):
@@ -467,6 +508,8 @@ def fill_structs(timestamp, id, msg):
 
 
 def fill_with_telemetry_log(timestamp, id, msg):
+    modifiedSensors = []
+
     if(id == "/imu_old/accel"):
         a.scale = msg[3]
         a.scale = 4
@@ -476,6 +519,7 @@ def fill_with_telemetry_log(timestamp, id, msg):
         a.y = msg[1]
         a.z = msg[2]
         a.count += 1
+        modifiedSensors.append(a.type)
 
     if(id == "/imu_old/gyro"):
         g.scale = msg[3]
@@ -485,34 +529,42 @@ def fill_with_telemetry_log(timestamp, id, msg):
         g.y = msg[1]
         g.z = msg[2]
         g.count += 1
+        modifiedSensors.append(g.type)
 
     if(id == "/bms_lv/values"):
         bmsLV.voltage = msg[0]
         bmsLV.temp = msg[1]
         bmsLV.count += 1
+        modifiedSensors.append(bmsLV.type)
 
     if(id == "/front_wheels_encoders/right/angle"):
         speed.count += 1
+        modifiedSensors.append(speed.type)
         pass
     if(id == "/front_wheels_encoders/right/speed"):
         speed.r_kmh = msg[0]
+        modifiedSensors.append(speed.type)
         speed.count += 1
     if(id == "/front_wheels_encoders/right/speed_rads"):
         speed.r_rads = msg[0]
+        modifiedSensors.append(speed.type)
         speed.count += 1
 
     if(id == "/front_wheels_encoders/left/angle"):
         speed.count += 1
+        modifiedSensors.append(speed.type)
         pass
     if(id == "/front_wheels_encoders/left/speed"):
         speed.count += 1
+        modifiedSensors.append(speed.type)
         speed.l_kmh = msg[0]
     if(id == "/front_wheels_encoders/left/speed_rads"):
-        speed.count += 1
         speed.l_rads = msg[0]
+        modifiedSensors.append(speed.type)
+        speed.count += 1
 
 
-def displaySensors(name):
+def displaySensors(name, background):
     # global image, BACKGROUND, sensors, imageToDisplay
     global imageToDisplay, newImage
 
@@ -554,27 +606,30 @@ def displaySensors(name):
         image = display_log_time(
             image, log_start_time, log_end_time, timestamp-offset_time)
 
-    idxs = image[:, :, 3] > 0
-    BACKGROUND[idxs] = image[idxs]
-
     mute.acquire()
+    idxs = image[:, :, 3] > 0
+    background[idxs] = image[idxs]
+
     newImage = True
-    lastImage = BACKGROUND
+    lastImage = background
     mute.release()
 
 
+###################################################################
+############################### CSV #############BACKGROUND##################
+###################################################################
 if(LOG_FILE_MODE and CREATE_CSV):
     fil = open(filename, 'r')
     lines = fil.readlines()[START_LINE:]
     for line in lines:
         timestamp, id, payload = parse_message(line)
         if(not TELEMETRY_LOG):
-            modifiecSensors = fill_structs(timestamp, id, payload)
+            modifiedSensors = fill_structs(timestamp, id, payload)
         else:
-            modifiecSensors = fill_with_telemetry_log(timestamp, id, payload)
+            modifiedSensors = fill_with_telemetry_log(timestamp, id, payload)
 
         for sensor in sensors:
-            if(sensor.type in modifiecSensors):
+            if(sensor.type in modifiedSensors):
                 txt = ""
                 obj, names = sensor.get_obj()
                 csvline = str(sensor.time) + ";"
@@ -582,6 +637,10 @@ if(LOG_FILE_MODE and CREATE_CSV):
                     csvline += str(e) + ";"
                 sensor.file_.write(csvline + "\n")
 
+
+###################################################################
+############################## MAIN ###############################
+###################################################################
 
 if __name__ == "__main__":
     line = ""
@@ -612,26 +671,15 @@ if __name__ == "__main__":
             log_start_time = parse_message(lines[START_LINE])[0]
             log_end_time = parse_message(lines[-1])[0]
 
-    '''
-    for i, lin in enumerate(lines):
-        msg = parse_message(lin)
-        if (msg[2] == 0x0B or (msg[2] == 513 and msg[3] == 0x90) or  (msg[2] == 0xAA)):
-            print(msg)
-
-        # if(msg[1] == 0xAA and msg[2] == 0x04):
-        if(msg[1] == 85):
-            print(i, msg)
-        if(msg[1] == 0xAA):
-            print(i, msg)
-
-    '''
-
-    print("DONE\n\n")
-
     print("Start analizing CAN messages")
     start_time = time.time()
     frameRateTime = time.time()
     dt = time.time()
+
+    ###################################################################
+    ############################## WHILE ##############################
+    ###################################################################
+
     while True:
         if Pause:
             key = cv2.waitKey(1)
@@ -669,11 +717,29 @@ if __name__ == "__main__":
             continue
 
         if(not TELEMETRY_LOG):
-            fill_structs(timestamp, id, payload)
+            modifiedSensors = fill_structs(timestamp, id, payload)
         else:
-            fill_with_telemetry_log(timestamp, id, payload)
+            modifiedSensors = fill_with_telemetry_log(timestamp, id, payload)
 
-        if(time.time() - start_time >= analisys_duration):
+        ###################################################################
+        ############################### CSV ###############################
+        ###################################################################
+
+        if(not len(modifiedSensors) == 0 and not LOG_FILE_MODE and CREATE_CSV):
+            for sensor in sensors:
+                if(sensor.type in modifiedSensors):
+                    txt = ""
+                    obj, names = sensor.get_obj()
+                    csvline = str(sensor.time) + ";"
+                    for i, e in enumerate(obj):
+                        csvline += str(e) + ";"
+                    sensor.file_.write(csvline + "\n")
+
+        ###################################################################
+        ########################### ANALYSIS DATA #########################
+        ###################################################################
+
+        if(time.time() - start_time >= analysis_duration):
 
             # PRINT SENSORS DATA
             for sensor in sensors:
@@ -698,13 +764,17 @@ if __name__ == "__main__":
             # PRINT GENERAL CAN DATA
             to_print_lines.append("Messages: {}".format(tot_msg))
             to_print_lines.append("Frequency: {}".format(
-                tot_msg / analisys_duration))
+                tot_msg / analysis_duration))
             to_print_lines.append("Average Delta: {}".format(
-                analisys_duration / tot_msg))
+                analysis_duration / tot_msg))
             to_print_lines.append(separator1 * separator_count)
 
             tot_msg = 0
             start_time = time.time()
+
+        ###################################################################
+        ########################### ANALYSIS PRINT ########################
+        ###################################################################
 
         # Print lines after clearing terminal
         if(len(to_print_lines) > 0):
@@ -714,17 +784,26 @@ if __name__ == "__main__":
             prev_line_count = len(to_print_lines)
             to_print_lines = []
 
+        ###################################################################
+        ############################# UI THREAD ###########################
+        ###################################################################
+
         # Dispaying Image with all data every 0.3 sec
-        if(time.time() - frameRateTime > 0.041):
+        if(time.time() - frameRateTime > 1/framerate):
             frameRateTime = time.time()
 
-            BACKGROUND[:, :] = BACKGROUND_COLOR
+            if(ENABLE_VIDEO):
+                ret, frame = movie.read()
+                BACKGROUND = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
+            else:
+                BACKGROUND[:, :] = BACKGROUND_COLOR
 
-            t = threading.Thread(target=displaySensors, args=("None",))
+            t = threading.Thread(target=displaySensors,
+                                 args=("None", BACKGROUND,))
             t.start()
 
         if(newImage):
-            cv2.imshow(Window_Name, lastImage)
+            cv2.imshow(Window_Name, BACKGROUND)
             newImage = False
 
         key = cv2.waitKey(1)

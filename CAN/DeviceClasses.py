@@ -96,6 +96,8 @@ class Pedals:
     type = "Pedals"
     throttle1 = 0
     throttle2 = 0
+    front = 0
+    back = 0
     brake = 0
     time = 0
     count = 0
@@ -108,11 +110,16 @@ class Pedals:
         obj = [
             self.throttle1,
             self.throttle2,
-            self.brake
+            self.front,
+            self.back,
+            self.brake,
+
         ]
         names = [
             "throttle1",
             "throttle2",
+            "front",
+            "back",
             "brake"
         ]
         return obj, names
