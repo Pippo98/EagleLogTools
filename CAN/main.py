@@ -1,28 +1,45 @@
-# !/urs/bin/env python3
+#!/usr/bin/env python3
 
-import cv2
-import time
-import threading
-import serial
-import numpy as np
-import serial.tools.list_ports as lst
-from termcolor import colored, cprint
-
-import DeviceClasses
-from Display_Car import *
 from telemetryParser import *
+from Display_Car import *
+import DeviceClasses
+from termcolor import colored, cprint
+import serial.tools.list_ports as lst
+import numpy as np
+import serial
+import threading
+import time
+import cv2
+import getch
+
 
 mute = threading.Lock()
+#################################################################################
+
+SIMULATE_STEERING = True
+
+LOG_FILE_MODE = False
+
+TELEMETRY_LOG = False
+VOLANTE_DUMP = True
+
+CREATE_CSV = True
 
 Pause = False
-ENABLE_VIDEO = False
+ENABLE_MOVIE = False
+
+ENABLE_PRINTING = False
+ENABLE_DISPLAYER = True
+
+
+#################################################################################
 
 ''' IMAGE '''
 # creating background image to display data onto it
 WIDTH = 1000
 HEIGHT = 700
 movie = 0
-if ENABLE_VIDEO:
+if ENABLE_MOVIE:
     movie = cv2.VideoCapture(0)
     ret, first_frame = movie.read()
     HEIGHT = len(first_frame)
@@ -41,7 +58,7 @@ lastImage = BACKGROUND
 
 framerate = 30
 
-if(ENABLE_VIDEO):
+if(ENABLE_MOVIE):
     framerate = movie.get(cv2.CAP_PROP_FPS)
 
 ''' END IMAGE '''
@@ -102,10 +119,6 @@ sensors.append(bmsHV)
 
 image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 
-LOG_FILE_MODE = True
-TELEMETRY_LOG = False
-VOLANTE_DUMP = True
-CREATE_CSV = False
 START_LINE = 2
 SPEED_UP = 5
 # filename = "/home/filippo/Desktop/logFile_1.txt"
@@ -143,8 +156,10 @@ if(LOG_FILE_MODE):
 else:
     Window_Name = "Displaying Real Time Data"
 
-cv2.namedWindow(Window_Name, cv2.WINDOW_NORMAL)
-cv2.resizeWindow(Window_Name, WIDTH, HEIGHT)
+
+if ENABLE_DISPLAYER:
+    cv2.namedWindow(Window_Name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(Window_Name, WIDTH, HEIGHT)
 
 log_start_time = 0
 log_end_time = 0
@@ -168,7 +183,6 @@ def open_device(dev):
     ser.port = dev
     ser.baudrate = 2250000
     ser.open()
-    ser.readline()
 
 
 def parse_message(msg):
@@ -176,7 +190,7 @@ def parse_message(msg):
     id = 0
     payload = []
 
-    if(not VOLANTE_DUMP and not TELEMETRY_LOG):
+    if(not LOG_FILE_MODE):
         msg = msg.replace("\r\n", "")
         msg = msg.split("\t")
         if(not len(msg) == 10):
@@ -192,7 +206,6 @@ def parse_message(msg):
         id = (int(msg[2].split("#")[0], 16))
         for i in range(0, len(msg[2].split("#")[1]), 2):
             payload.append((int(msg[2].split("#")[1][i:i+2], 16)))
-
     else:
         msg = msg.replace("\n", "")
         msg = msg.split("\t")
@@ -508,6 +521,7 @@ def fill_structs(timestamp, id, msg):
 
 
 def fill_with_telemetry_log(timestamp, id, msg):
+    time_ = timestamp
     modifiedSensors = []
 
     if(id == "/imu_old/accel"):
@@ -519,6 +533,7 @@ def fill_with_telemetry_log(timestamp, id, msg):
         a.y = msg[1]
         a.z = msg[2]
         a.count += 1
+        a.time = time_
         modifiedSensors.append(a.type)
 
     if(id == "/imu_old/gyro"):
@@ -529,12 +544,14 @@ def fill_with_telemetry_log(timestamp, id, msg):
         g.y = msg[1]
         g.z = msg[2]
         g.count += 1
+        g.time = time_
         modifiedSensors.append(g.type)
 
     if(id == "/bms_lv/values"):
         bmsLV.voltage = msg[0]
         bmsLV.temp = msg[1]
         bmsLV.count += 1
+        bmsLV.time = time_
         modifiedSensors.append(bmsLV.type)
 
     if(id == "/front_wheels_encoders/right/angle"):
@@ -642,6 +659,51 @@ if(LOG_FILE_MODE and CREATE_CSV):
 ############################## MAIN ###############################
 ###################################################################
 
+
+def simulateSteeringWheel():
+    while True:
+        key = getch.getch()
+        if key == "1":
+            print("Sending BmsHV ON")
+
+            ser.write("160 003 000 000 000 000 000 000 000\n".encode())
+
+            print("DONE")
+        if key == "2":
+            print("Sending INVL ON")
+
+            ser.write("160 008 000 000 000 000 000 000 000\n".encode())
+
+            time.sleep(1)
+
+            print("Sending INVR ON")
+            ser.write("160 009 000 000 000 000 000 000 000\n".encode())
+
+            print("DONE")
+
+        if key == "3":
+            print("Sending RUN")
+
+            ser.write("160 005 000 000 000 000 000 000 000\n".encode())
+            print("DONE")
+
+        if key == "0":
+            print("Sending STOP")
+
+            ser.write("160 004 000 000 000 000 000 000 000\n".encode())
+            print("DONE")
+
+        if key == "9":
+            print("nu")
+
+            ser.write("162 000 000 000 000 000 000 000 000\n".encode())
+
+            print("DONE")
+
+        if key == "q":
+            exit(0)
+
+
 if __name__ == "__main__":
     line = ""
     offset_time = 0
@@ -700,15 +762,19 @@ if __name__ == "__main__":
 
                 print("LOG FILE ENDED")
                 exit(0)
+            except KeyboardInterrupt:
+                exit(0)
             timestamp, id, payload = parse_message(line)
             if(payload == None):
                 continue
             # while((timestamp - offset_time) / SPEED_UP > time.time() - dt):
             #     continue
         else:
-            msg = str(ser.readline(), 'ascii')
             try:
+                msg = str(ser.readline(), 'ascii')
                 timestamp, id, payload = parse_message(msg)
+            except KeyboardInterrupt:
+                exit(0)
             except:
                 continue
 
@@ -776,42 +842,44 @@ if __name__ == "__main__":
         ########################### ANALYSIS PRINT ########################
         ###################################################################
 
-        # Print lines after clearing terminal
-        if(len(to_print_lines) > 0):
-            print(("\033[F" + " "*separator_count) * (prev_line_count+1))
-            for line in to_print_lines:
-                print(line)
-            prev_line_count = len(to_print_lines)
-            to_print_lines = []
+        if ENABLE_PRINTING:
+            # Print lines after clearing terminal
+            if(len(to_print_lines) > 0):
+                print(("\033[F" + " "*separator_count) * (prev_line_count+1))
+                for line in to_print_lines:
+                    print(line)
+                prev_line_count = len(to_print_lines)
+                to_print_lines = []
 
         ###################################################################
         ############################# UI THREAD ###########################
         ###################################################################
 
-        # Dispaying Image with all data every 0.3 sec
-        if(time.time() - frameRateTime > 1/framerate):
-            frameRateTime = time.time()
+        if ENABLE_DISPLAYER:
+            # Dispaying Image with all data every 0.3 sec
+            if(time.time() - frameRateTime > 1/framerate):
+                frameRateTime = time.time()
 
-            if(ENABLE_VIDEO):
-                ret, frame = movie.read()
-                BACKGROUND = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
-            else:
-                BACKGROUND[:, :] = BACKGROUND_COLOR
+                if(ENABLE_MOVIE):
+                    ret, frame = movie.read()
+                    BACKGROUND = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
+                else:
+                    BACKGROUND[:, :] = BACKGROUND_COLOR
 
-            t = threading.Thread(target=displaySensors,
-                                 args=("None", BACKGROUND,))
-            t.start()
+                t = threading.Thread(target=displaySensors,
+                                     args=("None", BACKGROUND,))
+                t.start()
 
-        if(newImage):
-            cv2.imshow(Window_Name, BACKGROUND)
-            newImage = False
+            if(newImage):
+                cv2.imshow(Window_Name, BACKGROUND)
+                newImage = False
 
-        key = cv2.waitKey(1)
-        if key == 27:  # EXIT
-            print("\n")
-            cv2.destroyAllWindows()
-            exit(0)
-        if key == 32:  # SPACEBAR
-            Pause = not Pause
+            key = cv2.waitKey(1)
+            if key == 27:  # EXIT
+                print("\n")
+                cv2.destroyAllWindows()
+                exit(0)
+            if key == 32:  # SPACEBAR
+                Pause = not Pause
 
 ser.close()
