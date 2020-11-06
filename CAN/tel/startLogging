@@ -1,0 +1,6 @@
+#!/bin/sh
+
+./candump &
+./GPS &
+
+exit 0

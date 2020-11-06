@@ -11,6 +11,7 @@ import threading
 import time
 import cv2
 import getch
+import subprocess
 
 
 info = lst.comports()
@@ -87,6 +88,12 @@ if (port):
             ser.write("160 004 000 000 000 000 000 000 000".encode())
             print("DONE")
 
+        if key == "e":
+            print("Sending STOP ", end="")
+
+            ser.write("160 002 000 000 000 000 000 000 000".encode())
+            print("DONE")
+
         if key == "p":
 
             if pedalsMin:
@@ -115,11 +122,11 @@ if (port):
 
             if pedalsMin:
                 print("Setting Steering MIN ", end="")
-                ser.write("187 002 000 000 000 000 000 000 000".encode())
+                ser.write("188 002 000 000 000 000 000 000 000".encode())
                 pedalsMin = False
             else:
                 print("Setting Steering MAX ", end="")
-                ser.write("187 002 001 000 000 000 000 000 000".encode())
+                ser.write("188 002 001 000 000 000 000 000 000".encode())
                 pedalsMin = True
 
             print("DONE")

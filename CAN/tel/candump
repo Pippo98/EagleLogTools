@@ -1,0 +1,16 @@
+#!/bin/sh
+
+path="/home/ubuntu/logs/"
+
+number=0
+
+fname=0.log
+
+while [ -f "$path$fname" ]; do
+    number=$(( $number + 1 ))
+    fname="${number}.log"
+done
+
+candump -Ld can0 > "$path/$fname" &
+
+exit 0 

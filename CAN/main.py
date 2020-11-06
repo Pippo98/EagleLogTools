@@ -11,6 +11,7 @@ import threading
 import time
 import cv2
 import getch
+import re
 
 
 mute = threading.Lock()
@@ -23,12 +24,12 @@ LOG_FILE_MODE = False
 TELEMETRY_LOG = False
 VOLANTE_DUMP = True
 
-CREATE_CSV = True
+CREATE_CSV = False
 
 Pause = False
 ENABLE_MOVIE = False
 
-ENABLE_PRINTING = False
+ENABLE_PRINTING = True
 ENABLE_DISPLAYER = True
 
 
@@ -126,8 +127,9 @@ SPEED_UP = 5
 # filename = "/home/filippo/Desktop/20HzSensors.log"
 # filename = "/home/filippo/Desktop/InitialStatus.log"
 # filename = "/home/filippo/Desktop/newECU-20Hz.log"
-filename = "/home/filippo/Desktop/newlogs/candump/0.log"
+filename = "/home/filippo/Desktop/newlogs/candump/can.log"
 # filename = "/home/filippo/Desktop/newlogs/2020-11-3_20_3_15/eagle_test/temp.temp"
+# filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/06-nov-2020__12-16-31/3.log"
 
 
 # create a csv file for each sensor with all values parsed
@@ -171,6 +173,7 @@ ser = serial.Serial()
 
 def find_Stm():
     for port in info:
+        print(port.product)
         if(port.product.find("Pyboard") != -1):
             return port.device, port.product
     for port in info:
@@ -201,6 +204,7 @@ def parse_message(msg):
             payload.append(int(m))
     elif VOLANTE_DUMP:
         msg = msg.replace("\n", "")
+        msg = re.sub(' +', ' ', msg)
         msg = msg.split(" ")
         timestamp = (float(msg[0].replace("(", "").replace(")", "")))
         id = (int(msg[2].split("#")[0], 16))
@@ -488,9 +492,7 @@ def fill_structs(timestamp, id, msg):
     # INVERTER RIGHT
     if(id == 0x182):
         if(msg[0] == 0xA0):
-            invr.torque = (msg[2] * 256 + msg[1]) / 218.446666667
-            if(invr.torque > 150):
-                invr.torque -= 300
+            invr.torque = (msg[2] * 256 + msg[1])
             invr.time = time_
         if(msg[0] == 0x4A):
             invr.temp = (msg[2] * 256 + msg[1] - 15797) / 112.1182
@@ -499,8 +501,7 @@ def fill_structs(timestamp, id, msg):
             invr.motorTemp = (msg[2] * 256 + msg[1] - 9393.9) / 55.1
             invr.time = time_
         if(msg[0] == 0xA8):
-            invr.speed = (msg[2] * 256 + msg[1]) / 9.112932605
-            invr.speed = ((invr.speed/(60))*0.395)*3.6
+            invr.speed = (msg[2] * 256 + msg[1])
             invr.time = time_
             '''
             invr.speed = (msg[2] * 256 + msg[1])
