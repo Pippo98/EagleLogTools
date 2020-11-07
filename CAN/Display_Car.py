@@ -227,8 +227,8 @@ def display_enc(image, enc):
 
 def display_steer(image, steer):
 
-    angle = (steer.angle - 50)*-1
-    text = str(angle)
+    angle = (steer.angle - 100)*-1
+    text = str(int(angle))
 
     textsize = cv2.getTextSize(text, FONT, 1, 2)[0]
 

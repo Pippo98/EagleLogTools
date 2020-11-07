@@ -3,6 +3,7 @@
 from telemetryParser import *
 from Display_Car import *
 import DeviceClasses
+from browseTerminal import terminalBrowser
 from termcolor import colored, cprint
 import serial.tools.list_ports as lst
 import numpy as np
@@ -19,7 +20,7 @@ mute = threading.Lock()
 
 SIMULATE_STEERING = True
 
-LOG_FILE_MODE = False
+LOG_FILE_MODE = True
 
 TELEMETRY_LOG = False
 VOLANTE_DUMP = True
@@ -73,7 +74,7 @@ to_clear = False
 prev_line_count = 0
 to_print_lines = []
 tot_msg = 0
-analysis_duration = 1
+analysis_duration = 0.2
 
 a = DeviceClasses.Accel_Gyro()
 g = DeviceClasses.Accel_Gyro()
@@ -127,9 +128,13 @@ SPEED_UP = 5
 # filename = "/home/filippo/Desktop/20HzSensors.log"
 # filename = "/home/filippo/Desktop/InitialStatus.log"
 # filename = "/home/filippo/Desktop/newECU-20Hz.log"
-filename = "/home/filippo/Desktop/newlogs/candump/can.log"
+# filename = "/home/filippo/Desktop/newlogs/candump/can.log"
 # filename = "/home/filippo/Desktop/newlogs/2020-11-3_20_3_15/eagle_test/temp.temp"
-# filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/06-nov-2020__12-16-31/3.log"
+# filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/06-nov-2020__19-36-59/0.log"
+filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/"
+if LOG_FILE_MODE:
+    tb = terminalBrowser(startPath=filename)
+    filename = tb.browse()
 
 
 # create a csv file for each sensor with all values parsed
@@ -203,13 +208,16 @@ def parse_message(msg):
         for m in msg[2:]:
             payload.append(int(m))
     elif VOLANTE_DUMP:
-        msg = msg.replace("\n", "")
-        msg = re.sub(' +', ' ', msg)
-        msg = msg.split(" ")
-        timestamp = (float(msg[0].replace("(", "").replace(")", "")))
-        id = (int(msg[2].split("#")[0], 16))
-        for i in range(0, len(msg[2].split("#")[1]), 2):
-            payload.append((int(msg[2].split("#")[1][i:i+2], 16)))
+        try:
+            msg = msg.replace("\n", "")
+            msg = re.sub(' +', ' ', msg)
+            msg = msg.split(" ")
+            timestamp = (float(msg[0].replace("(", "").replace(")", "")))
+            id = (int(msg[2].split("#")[0], 16))
+            for i in range(0, len(msg[2].split("#")[1]), 2):
+                payload.append((int(msg[2].split("#")[1][i:i+2], 16)))
+        except:
+            return timestamp, id, None
     else:
         msg = msg.replace("\n", "")
         msg = msg.split("\t")
@@ -245,6 +253,7 @@ def fill_structs(timestamp, id, msg):
             modifiedSensors.append(pedals.type)
             pedals.time = time_
         if(msg[0] == 0x02):
+            # print(msg)
             pedals.brake = msg[1]
             pedals.front = (msg[2] * 256 + msg[4]) / 500
             pedals.back = (msg[5] * 256 + msg[7]) / 500
@@ -335,7 +344,8 @@ def fill_structs(timestamp, id, msg):
 
         # STEER
         if(msg[0] == 2):
-            steer.angle = msg[1]
+            steer.angle = (msg[1] * 256 + msg[2])/100
+            steer.angle = round(steer.angle, 3)
             steer.time = time_
             steer.count += 1
             modifiedSensors.append(steer.type)
