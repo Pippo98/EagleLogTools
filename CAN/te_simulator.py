@@ -23,11 +23,21 @@ while True:
     if key == "2":
         print("Sending INVL ON ", end="")
         subprocess.run("cansend can0 0A0#0800000000000000", shell=True)
+        time.sleep(0.001)
+        subprocess.run("cansend can0 0A0#0800000000000000", shell=True)
+        time.sleep(0.001)
+        subprocess.run("cansend can0 0A0#0800000000000000", shell=True)
+
+        print("DONE")
 
         time.sleep(1)
 
         print("INVR ON ", end="")
 
+        subprocess.run("cansend can0 0A0#0900000000000000", shell=True)
+        time.sleep(0.001)
+        subprocess.run("cansend can0 0A0#0900000000000000", shell=True)
+        time.sleep(0.001)
         subprocess.run("cansend can0 0A0#0900000000000000", shell=True)
 
         print("DONE")

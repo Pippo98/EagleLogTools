@@ -15,6 +15,22 @@ class terminalBrowser:
         self.printedLines = 0
         self.selectedFile = None
         self.previousIdx = []
+
+        base = "/"
+        dirs = os.listdir(base)
+
+        paths = startPath.split("/")
+        paths = " ".join(paths).split()
+
+        for folder in paths:
+            idx = dirs.index(folder)
+
+            self.previousIdx.append(idx)
+
+            base = base + folder + "/"
+
+            dirs = os.listdir(base)
+
         super().__init__()
 
     def browse(self):
@@ -23,12 +39,19 @@ class terminalBrowser:
         self.selected = False
         while self.selected == False:
             jumTermClear = False
+
             try:
-                self.currentDirs = os.listdir(self.currentPath)
-                self.printDirs()
+                bff = os.listdir(self.currentPath)
+
+                self.currentDirs = sorted(list(filter(
+                    lambda x: os.path.isdir(self.currentPath + "/" + x), bff)))
+                self.currentDirs += sorted(list(filter(
+                    lambda x: not os.path.isdir(self.currentPath + "/" + x), bff)))
+
             except:
                 print(colored("Permisson Denied",
                               "red", attrs=['blink']), end="\r")
+            self.printDirs()
 
             key = getch.getch()
             if key == "\n":
@@ -52,8 +75,8 @@ class terminalBrowser:
 
             if key == "d":
                 if os.path.isdir(self.currentPath + "/" + self.currentDirs[self.currentIndex]):
-                    self.currentPath += "/" + \
-                        self.currentDirs[self.currentIndex]
+                    self.currentPath = os.path.join(
+                        self.currentPath, self.currentDirs[self.currentIndex])
                     self.previousIdx.append(self.currentIndex)
                     self.currentIndex = 0
                 else:
@@ -69,15 +92,11 @@ class terminalBrowser:
                     self.selectedFile = self.currentDirs[self.currentIndex]
 
             if key == "a":
-                if self.currentPath != "/":
-                    self.currentPath = self.currentPath.split("/")
-                    self.currentPath.pop()
-                    self.currentPath.insert(0, "")
-                    self.currentPath = "/".join(self.currentPath)
-                    if(len(self.previousIdx) > 0):
-                        self.currentIndex = self.previousIdx.pop()
-                    else:
-                        self.currentIndex = 0
+                self.currentPath, lastDir = os.path.split(self.currentPath)
+                if(len(self.previousIdx) > 0):
+                    self.currentIndex = self.previousIdx.pop()
+                else:
+                    self.currentIndex = 0
 
             if not jumTermClear:
                 self.clearTerm()
@@ -111,6 +130,9 @@ class terminalBrowser:
 
             lenExceed = True
 
+        print(colored(self.currentPath, "white"))
+        self.printedLines += 1
+
         for i, dir_ in enumerate(dirs):
             printable = colored(dir_, "white")
 
@@ -118,11 +140,11 @@ class terminalBrowser:
                 printable = colored(dir_, "yellow")
 
             if dir_ == self.currentDirs[self.currentIndex]:
-                printable = "-->" + dir_
+                printable = "  " + dir_
                 printable = colored(printable, "red")
 
             if dir_ == self.selectedFile:
-                printable = "--->" + dir_
+                printable = "===>" + dir_
                 printable = colored(printable, "green")
 
             print(printable)

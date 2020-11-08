@@ -20,12 +20,12 @@ from browseTerminal import terminalBrowser
 mute = threading.Lock()
 #################################################################################
 
-SIMULATE_STEERING = True
+SIMULATE_STEERING = False
 
 LOG_FILE_MODE = False
 
 TELEMETRY_LOG = False
-VOLANTE_DUMP = False
+VOLANTE_DUMP = True
 
 CREATE_CSV = False
 
@@ -38,25 +38,13 @@ ENABLE_DISPLAYER = True
 
 #################################################################################
 
-
 for arg in sys.argv[1:]:
-    if(arg == "--nodisplay"):
+    if(arg == "--ndisplay"):
         ENABLE_DISPLAYER = False
-    if(arg == "--noprint"):
+    if(arg == "--nprint"):
         ENABLE_PRINTING = False
-
-    if(arg == "--telemetry"):
+    if(arg == "--log"):
         LOG_FILE_MODE = True
-        TELEMETRY_LOG = True
-
-    if(arg == "--nodump"):
-        LOG_FILE_MODE = True
-        VOLANTE_DUMP = False
-
-    if(arg == "--dump"):
-        LOG_FILE_MODE = True
-        VOLANTE_DUMP = True
-
     if(arg == "--def0"):
         ENABLE_DISPLAYER = True
         ENABLE_PRINTING = True
@@ -160,7 +148,15 @@ image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 
 START_LINE = 2
 SPEED_UP = 5
-filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER"
+# filename = "/home/filippo/Desktop/logFile_1.txt"
+# filename = "/media/filippo/label/Codes/Github/EagleLogTools/Logs/TEST_VADENA/volante_dump/4-5/5.log"
+# filename = "/home/filippo/Desktop/20HzSensors.log"
+# filename = "/home/filippo/Desktop/InitialStatus.log"
+# filename = "/home/filippo/Desktop/newECU-20Hz.log"
+# filename = "/home/filippo/Desktop/newlogs/candump/can.log"
+# filename = "/home/filippo/Desktop/newlogs/2020-11-3_20_3_15/eagle_test/temp.temp"
+# filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/06-nov-2020__19-36-59/0.log"
+filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/"
 
 
 def init_variables():
@@ -676,7 +672,7 @@ def displaySensors(name, background):
 
 
 ###################################################################
-############################### CSV #############BACKGROUND##################
+############################### CSV ###############################
 ###################################################################
 def parse_and_CSV():
     print("START CSV PARSING")
@@ -700,6 +696,7 @@ def parse_and_CSV():
                 sensor.file_.write(csvline + "\n")
 
     print("END")
+
 
 ###################################################################
 ############################## MAIN ###############################

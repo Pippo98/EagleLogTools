@@ -3,7 +3,7 @@ import math
 import numpy as np
 import DeviceClasses as dev
 
-FONT = cv2.FONT_HERSHEY_DUPLEX
+FONT = cv2.FONT_HERSHEY_SIMPLEX
 FONT_SIZE = 0.6
 SPAN = 40
 lineSpacing = 4
