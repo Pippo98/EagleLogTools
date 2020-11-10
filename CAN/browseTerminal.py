@@ -15,23 +15,22 @@ class terminalBrowser:
         self.printedLines = 0
         self.selectedFile = None
         self.previousIdx = []
-
-        base = "/"
-        dirs = os.listdir(base)
+        self.previousFolders = []
+        self.currentFolder = None
 
         paths = startPath.split("/")
-        paths = " ".join(paths).split()
-
-        for folder in paths:
-            idx = dirs.index(folder)
-
-            self.previousIdx.append(idx)
-
-            base = base + folder + "/"
-
-            dirs = os.listdir(base)
+        self.previousFolders = " ".join(paths).split()
 
         super().__init__()
+
+    def list_and_sort(self, path):
+        bff = os.listdir(path)
+
+        dirs = sorted(list(filter(
+            lambda x: os.path.isdir(self.currentPath + "/" + x), bff)))
+        dirs += sorted(list(filter(
+            lambda x: not os.path.isdir(self.currentPath + "/" + x), bff)))
+        return dirs
 
     def browse(self):
         print("To browse in files use WASD: W and S to move up and down, A and D to move back and forward", end="\n\n")
@@ -41,13 +40,9 @@ class terminalBrowser:
             jumTermClear = False
 
             try:
-                bff = os.listdir(self.currentPath)
+                self.currentDirs = self.list_and_sort(self.currentPath)
 
-                self.currentDirs = sorted(list(filter(
-                    lambda x: os.path.isdir(self.currentPath + "/" + x), bff)))
-                self.currentDirs += sorted(list(filter(
-                    lambda x: not os.path.isdir(self.currentPath + "/" + x), bff)))
-
+                self.currentFolder = self.currentDirs[self.currentIndex]
             except:
                 print(colored("Permisson Denied",
                               "red", attrs=['blink']), end="\r")
@@ -78,6 +73,7 @@ class terminalBrowser:
                     self.currentPath = os.path.join(
                         self.currentPath, self.currentDirs[self.currentIndex])
                     self.previousIdx.append(self.currentIndex)
+                    self.previousFolders.append(self.currentFolder)
                     self.currentIndex = 0
                 else:
                     if self.selectedFile == self.currentDirs[self.currentIndex]:
@@ -93,10 +89,12 @@ class terminalBrowser:
 
             if key == "a":
                 self.currentPath, lastDir = os.path.split(self.currentPath)
-                if(len(self.previousIdx) > 0):
-                    self.currentIndex = self.previousIdx.pop()
+                if(len(self.previousFolders) > 0):
+                    self.currentFolder = self.previousFolders.pop()
+                    self.currentIndex = self.list_and_sort(
+                        self.currentPath).index(self.currentFolder)
                 else:
-                    self.currentIndex = 0
+                    self.currentFolder = None
 
             if not jumTermClear:
                 self.clearTerm()

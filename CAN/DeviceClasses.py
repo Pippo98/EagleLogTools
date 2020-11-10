@@ -260,3 +260,49 @@ class BMS:
         ]
 
         return obj, names
+
+
+class GPS:
+    type = "GPS"
+
+    latitude = 0
+    longitude = 0
+    altitude = 0
+    speed = 0
+    course = 0
+    timestamp = 0
+
+    count = 0
+    time = 0
+    file_ = ""
+
+    def __init__(self):
+        pass
+
+    def get_obj(self):
+        obj = [
+            self.timestamp,
+            self.latitude,
+            self.longitude,
+            self.altitude,
+            self.speed,
+            self.course,
+        ]
+        names = [
+            "timestamp",
+            "latitude",
+            "longitude",
+            "altitude",
+            "speed",
+            "course",
+        ]
+
+        return obj, names
+
+    def clear(self):
+        self.latitude = 0
+        self.longitude = 0
+        self.altitude = 0
+        self.speed = 0
+        self.course = 0
+        self.timestamp = 0

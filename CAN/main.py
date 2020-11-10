@@ -22,7 +22,7 @@ mute = threading.Lock()
 
 SIMULATE_STEERING = True
 
-LOG_FILE_MODE = False
+LOG_FILE_MODE = True
 
 TELEMETRY_LOG = False
 VOLANTE_DUMP = False
@@ -42,8 +42,13 @@ ENABLE_DISPLAYER = True
 for arg in sys.argv[1:]:
     if(arg == "--nodisplay"):
         ENABLE_DISPLAYER = False
+    if(arg == "--display"):
+        ENABLE_DISPLAYER = True
+
     if(arg == "--noprint"):
         ENABLE_PRINTING = False
+    if(arg == "--print"):
+        ENABLE_PRINTING = True
 
     if(arg == "--telemetry"):
         LOG_FILE_MODE = True
@@ -71,6 +76,14 @@ for arg in sys.argv[1:]:
         TELEMETRY_LOG = False
         VOLANTE_DUMP = True
         CREATE_CSV = True
+    if(arg == "--def2"):
+        ENABLE_DISPLAYER = True
+        ENABLE_PRINTING = True
+        LOG_FILE_MODE = True
+        TELEMETRY_LOG = False
+        VOLANTE_DUMP = True
+        ENABLE_MOVIE = False
+        CREATE_CSV = False
 
 
 ''' IMAGE '''
@@ -79,7 +92,8 @@ WIDTH = 1000
 HEIGHT = 700
 movie = 0
 if ENABLE_MOVIE:
-    movie = cv2.VideoCapture(0)
+    #movie = cv2.VideoCapture(0)
+    movie = cv2.VideoCapture("udp://10.5.5.9:8554", cv2.CAP_FFMPEG)
     ret, first_frame = movie.read()
     HEIGHT = len(first_frame)
     WIDTH = len(first_frame[0])
@@ -158,7 +172,7 @@ sensors.append(bmsHV)
 
 image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 
-START_LINE = 2
+START_LINE = 1
 SPEED_UP = 5
 filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER"
 
@@ -474,6 +488,7 @@ def fill_structs(timestamp, id, msg):
             bmsHV.voltage = ((msg[1] << 16) + (msg[2] << 8))/10000
             bmsHV.time = time_
             modifiedSensors.append(bmsHV.type)
+
         if(msg[0] == 0x05):
             bmsHV.current = (msg[1] * 256 + msg[2])/10
             bmsHV.time = time_
@@ -507,9 +522,7 @@ def fill_structs(timestamp, id, msg):
     # INVERTER LEFT
     if(id == 0x181):
         if(msg[0] == 0xA0):
-            invl.torque = (msg[2] * 256 + msg[1]) / 218.446666667
-            if(invl.torque > 150):
-                invl.torque -= 300
+            invl.torque = (msg[2] * 256 + msg[1])
             invl.time = time_
         if(msg[0] == 0x4A):
             invl.temp = (msg[2] * 256 + msg[1] - 15797) / 112.1182
@@ -518,9 +531,7 @@ def fill_structs(timestamp, id, msg):
             invl.motorTemp = (msg[2] * 256 + msg[1] - 9393.9) / 55.1
             invl.time = time_
         if(msg[0] == 0xA8):
-            invl.speed = (msg[2] * 256 + msg[1]) / \
-                9.112932605  # rmp 549 -> num 5003
-            invl.speed = ((invl.speed/(60))*0.395)*3.6
+            invl.speed = (msg[2] * 256 + msg[1])
             invl.time = time_
 
         invl.torque = round(invl.torque, 3)

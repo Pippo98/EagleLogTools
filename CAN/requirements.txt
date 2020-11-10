@@ -1,7 +1,9 @@
-opencv-contrib-python
+tqdm
 getch
-serial
-pyserial
 numpy
 serial
+serial
+folium
+pyserial
 termcolor
+opencv-contrib-python
