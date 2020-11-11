@@ -20,8 +20,8 @@ from browseTerminal import terminalBrowser
 
 
 VOLANTE_DUMP = True
-PARSE_DUMP = False
-PARSE_GPS = False
+PARSE_DUMP = True
+PARSE_GPS = True
 COMPRESS = True
 
 
@@ -219,6 +219,9 @@ def fill_GPS(timestamp, type, payload):
 
         gps.time = time_
 
+        gps.convert_latitude()
+        gps.convert_longitude()
+
         modified = True
         pass
 
@@ -230,6 +233,9 @@ def fill_GPS(timestamp, type, payload):
         gps.timestamp = float(payload[4])
 
         gps.time = time_
+
+        gps.convert_latitude()
+        gps.convert_longitude()
 
         modified = True
         pass
@@ -244,9 +250,10 @@ def fill_GPS(timestamp, type, payload):
         gps.speed = float(payload[6])
         gps.course = float(payload[7])
 
-        gps.altitude = float(payload[8])
-
         gps.time = time_
+
+        gps.convert_latitude()
+        gps.convert_longitude()
 
         modified = True
         pass
@@ -460,12 +467,21 @@ def fill_structs(timestamp, id, msg):
         if(msg[0] == 0x01):
             bmsHV.voltage = ((msg[1] << 16) + (msg[2] << 8))/10000
             bmsHV.time = time_
+            bmsHV.count += 1
             modifiedSensors.append(bmsHV.type)
 
         if(msg[0] == 0x05):
             bmsHV.current = (msg[1] * 256 + msg[2])/10
             bmsHV.time = time_
+            bmsHV.count += 1
             modifiedSensors.append(bmsHV.type)
+
+        if(msg[0] == 0xA0):
+            bmsHV.temp = (msg[1] * 256 + msg[2]) / 10
+
+            bmsHV.time = time_
+            bmsHV.count += 1
+            modifiedSensors.append(bmsHV)
 
         if(msg[0] == 0x03):
             cmds.active_commands.append(
@@ -670,7 +686,6 @@ if __name__ == "__main__":
 
     if(COMPRESS):
         toZipPaths = findAllFiles(basePath, ".csv")
-        print(toZipPaths)
 
         toZipPaths = list(dict.fromkeys(toZipPaths))
 

@@ -494,6 +494,13 @@ def fill_structs(timestamp, id, msg):
             bmsHV.time = time_
             modifiedSensors.append(bmsHV.type)
 
+        if(msg[0] == 0xA0):
+            bmsHV.temp = (msg[1] * 256 + msg[2]) / 10
+
+            bmsHV.time = time_
+            bmsHV.count += 1
+            modifiedSensors.append(bmsHV)
+
         if(msg[0] == 0x03):
             cmds.active_commands.append(
                 ("BMS is ON", time.time())

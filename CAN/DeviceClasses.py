@@ -306,3 +306,18 @@ class GPS:
         self.speed = 0
         self.course = 0
         self.timestamp = 0
+
+    def convert_latitude(self):
+        lat_degree = int(self.latitude / 100)
+
+        lat_mm_mmmm = self.latitude % 100
+
+        self.latitude = lat_degree + (lat_mm_mmmm / 60)
+
+    def convert_longitude(self):
+
+        lng_degree = int(self.longitude / 100)
+
+        lng_mm_mmmmm = self.longitude % 100
+
+        self.longitude = lng_degree + (lng_mm_mmmmm / 60)
