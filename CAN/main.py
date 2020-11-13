@@ -539,6 +539,8 @@ def fill_structs(timestamp, id, msg):
             invl.time = time_
         if(msg[0] == 0xA8):
             invl.speed = (msg[2] * 256 + msg[1])
+            if(invl.speed > 32768):
+                invl.speed -= 65536
             invl.time = time_
 
         invl.torque = round(invl.torque, 3)
@@ -562,6 +564,8 @@ def fill_structs(timestamp, id, msg):
             invr.time = time_
         if(msg[0] == 0xA8):
             invr.speed = (msg[2] * 256 + msg[1])
+            if(invr.speed > 32768):
+                invr.speed -= 65536
             invr.time = time_
             '''
             invr.speed = (msg[2] * 256 + msg[1])

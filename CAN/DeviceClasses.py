@@ -27,6 +27,15 @@ class Accel_Gyro:
         ]
         return obj, names
 
+    def get_dict(self):
+        _dict = {
+            "x": self.x,
+            "y": self.y,
+            "z": self.z,
+            "scale": self.scale
+        }
+        return _dict
+
 
 class Speed:
 
@@ -55,7 +64,7 @@ class Speed:
             self.angle0,
             self.angle1,
             self.delta,
-            self.frequency
+            self.frequency,
         ]
         names = [
             "left",
@@ -68,6 +77,19 @@ class Speed:
             "frequency"
         ]
         return obj, names
+
+    def get_dict(self):
+        _dict = {
+            "left": self.l_kmh,
+            "right": self.r_kmh,
+            "Rad/s Left": self.l_rads,
+            "Rad/s Right": self.r_rads,
+            "angle0": self.angle0,
+            "angle1": self.angle1,
+            "delta": self.delta,
+            "frequency": self.frequency,
+        }
+        return _dict
 
 
 class Steer:
@@ -89,6 +111,12 @@ class Steer:
             "angle"
         ]
         return obj, names
+
+    def get_dict(self):
+        _dict = {
+            "angle": self.angle
+        }
+        return _dict
 
 
 class Pedals:
@@ -120,9 +148,19 @@ class Pedals:
             "throttle2",
             "front",
             "back",
-            "brake"
+            "brake",
         ]
         return obj, names
+
+    def get_dict(self):
+        _dict = {
+            "throttle1": self.throttle1,
+            "throttle2": self.throttle2,
+            "front": self.front,
+            "back": self.back,
+            "brake": self.brake,
+        }
+        return _dict
 
 
 class ECU:
@@ -154,6 +192,15 @@ class ECU:
         ]
         return obj, names
 
+    def get_dict(self):
+        _dict = {
+            "errors": self.errors,
+            "warnings": self.warnings,
+            "state": self.state,
+            "map": self.map,
+        }
+        return _dict
+
 
 class SteeringWheel:
     type = "SteeringWheel"
@@ -175,6 +222,12 @@ class SteeringWheel:
         ]
         return obj, names
 
+    def get_dict(self):
+        _dict = {
+            "ok": self.ok
+        }
+        return _dict
+
 
 class Commands:
     type = "Commands"
@@ -189,13 +242,20 @@ class Commands:
         pass
 
     def get_obj(self):
-        return self.active_commands, "none"
+        return self.active_commands, "list of active commands"
 
     def remove_command(self):
         self.active_commands.pop(0)
 
     def clear(self):
         self.active_commands = []
+
+    def get_dict(self):
+        _dict = {
+            "commands": self.active_commands
+        }
+
+        return _dict
 
 
 class Inverter:
@@ -232,6 +292,16 @@ class Inverter:
 
         return obj, names
 
+    def get_dict(self):
+        _dict = {
+            "temperature": self.temp,
+            "Motor Temperature": self.motorTemp,
+            "Torque": self.torque,
+            "Speed": self.speed,
+            "state": self.state,
+        }
+        return _dict
+
 
 class BMS:
     type = "BMS"
@@ -260,6 +330,16 @@ class BMS:
         ]
 
         return obj, names
+
+    def get_dict(self):
+        _dict = {
+
+            "Temperature": self.temp,
+            "Voltage": self.voltage,
+            "Current": self.current,
+
+        }
+        return _dict
 
 
 class GPS:
@@ -298,6 +378,18 @@ class GPS:
         ]
 
         return obj, names
+
+    def get_dict(self):
+        _dict = {
+            "timestamp": self.timestamp,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "altitude": self.altitude,
+            "speed": self.speed,
+            "course": self.course,
+        }
+
+        return _dict
 
     def clear(self):
         self.latitude = 0

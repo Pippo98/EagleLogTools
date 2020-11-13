@@ -6,4 +6,5 @@ serial
 folium
 pyserial
 termcolor
+python-can
 opencv-contrib-python
