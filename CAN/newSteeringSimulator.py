@@ -10,7 +10,7 @@ from threading import Event
 
 
 bustype = 'socketcan_native'
-channel = 'can0'
+channel = 'vcan0'
 bus = can.interface.Bus(channel=channel, bustype=bustype)
 
 '''
@@ -30,6 +30,7 @@ message.remote
 id = 0
 payload = []
 
+cooling = False
 pedalsMin = True
 steeringMin = True
 map = [0xEC, 20, 40, 60, 80, 100]
@@ -37,7 +38,7 @@ map_idx = 1
 
 
 def receive(none):
-    global id, payload, newMessage
+    global id, payload
     while True:
         # newtoWaitMsg.wait()
         # toWaitId, toWaitPayload = q.get()
@@ -101,7 +102,8 @@ def receive(none):
                 if(errors & 0b10000000):
                     print("INVERTER RIGHT not present")
 
-                print("Map: {} State: {}\r".format(str(map_), str(state)), end="")
+                print("Map: {} State: {}\r".format(
+                    str(map_), str(state)), end="")
 
 
 msg = can.Message(arbitration_id=0x0,
@@ -112,6 +114,11 @@ if __name__ == "__main__":
 
     t = threading.Thread(target=receive, args=(None,))
     t.start()
+
+    msg.dlc = 3
+    msg.arbitration_id = 0xAF
+    msg.data = [0, 0]
+    cooling_task = bus.send_periodic(msg, 0.4)
 
     while True:
 
@@ -126,7 +133,7 @@ if __name__ == "__main__":
 
             # set the message and send it
             msg.arbitration_id = 0xA0
-            msg.data = [3,0,0]
+            msg.data = [3, 0, 0]
             bus.send(msg)
 
             print("DONE")
@@ -141,7 +148,6 @@ if __name__ == "__main__":
             msg.arbitration_id = 0xA0
             msg.data = [8]
             bus.send(msg)
-            time.sleep(0.001)
 
             time.sleep(1)
 
@@ -152,3 +158,135 @@ if __name__ == "__main__":
             # set the message and send it
             msg.arbitration_id = 0xA0
             msg.data = [9]
+            bus.send(msg)
+
+            print("DONE")
+
+        if key == "3":
+            print("Sending RUN with map: {}".format(map[map_idx]), end="")
+
+            msg.dlc = 2
+
+            # set the message and send it
+            msg.arbitration_id = 0xA0
+            msg.data = [5, map[map_idx]]
+            bus.send(msg)
+
+            print("DONE")
+
+        if key == "4":
+            print("Sending SETUP ", end="")
+
+            msg.dlc = 1
+
+            # set the message and send it
+            msg.arbitration_id = 0xA0
+            msg.data = [6]
+            bus.send(msg)
+
+            print("DONE")
+
+        if key == "5":
+            print("Sending IDLE ", end="")
+
+            msg.dlc = 1
+
+            # set the message and send it
+            msg.arbitration_id = 0xA0
+            msg.data = [4]
+            bus.send(msg)
+
+            print("DONE")
+
+        if key == "e":
+            print("Sending Request Errors ", end="")
+
+            msg.dlc = 1
+
+            # set the message and send it
+            msg.arbitration_id = 0xA0
+            msg.data = [2]
+            bus.send(msg)
+
+            print("DONE")
+
+        if key == "p":
+            msg.dlc = 2
+
+            if pedalsMin:
+                print("Setting Pedals MIN ", end="")
+
+                # set the message and send it
+                msg.arbitration_id = 0xBB
+                msg.data = [0, 0]
+                bus.send(msg)
+
+                pedalsMin = False
+            else:
+                print("Setting Pedals MAX ", end="")
+
+                # set the message and send it
+                msg.arbitration_id = 0xBB
+                msg.data = [0, 1]
+                bus.send(msg)
+                pedalsMin = True
+
+            print("DONE")
+
+        if key == "m":
+            msg.dlc = 2
+
+            map_idx = (map_idx + 1) % len(map)
+            currentMap = map[map_idx]
+
+            print("Setting MAP {} ".format(map[map_idx]), end="")
+
+            # set the message and send it
+            msg.arbitration_id = 0xA0
+            msg.data = [2, map[map_idx]]
+
+            bus.send(msg)
+            time.sleep(0.001)
+
+            print("DONE")
+
+        if key == "s":
+            msg.dlc = 2
+
+            if steeringMin:
+                print("Setting Steering MIN ", end="")
+                # set the message and send it
+                msg.arbitration_id = 0xBC
+                msg.data = [2, 0]
+                bus.send(msg)
+                steeringMin = False
+            else:
+                print("Setting Steering MAX ", end="")
+                # set the message and send it
+                msg.arbitration_id = 0xBC
+                msg.data = [2, 1]
+                bus.send(msg)
+                steeringMin = True
+
+            print("DONE")
+
+        if key == "c":
+            msg.dlc = 3
+
+            if cooling:
+                # STOP
+                msg.arbitration_id = 0xAF
+                msg.data = [0, 0]
+                cooling_task.modify_data(msg)
+                cooling = False
+            else:
+                # pump
+                msg.arbitration_id = 0xAF
+                msg.data = [2, 1, 100]
+                cooling_task.modify_data(msg)
+                cooling = True
+
+            print("SET Cooling to {}".format(cooling))
+
+        if key == "q":
+            exit(0)
