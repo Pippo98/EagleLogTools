@@ -39,28 +39,25 @@ filename = tb.browse()
 
 if __name__ == "__main__":
 
-    f = open(filename, "r")
+    while True:
+        f = open(filename, "r")
+        lines = f.readlines()
 
-    lines = f.readlines()
+        for e in lines:
+            id = 0
+            payload = []
 
-    for e in lines:
-        id = 0
-        payload = []
+            msg = e.replace("\n", "")
+            msg = re.sub(' +', ' ', msg)
+            msg = msg.split(" ")
+            timestamp = (float(msg[0].replace("(", "").replace(")", "")))
+            id = (int(msg[2].split("#")[0], 16))
+            for i in range(0, len(msg[2].split("#")[1]), 2):
+                payload.append((int(msg[2].split("#")[1][i:i+2], 16)))
 
-        msg = e.replace("\n", "")
-        msg = re.sub(' +', ' ', msg)
-        msg = msg.split(" ")
-        timestamp = (float(msg[0].replace("(", "").replace(")", "")))
-        id = (int(msg[2].split("#")[0], 16))
-        for i in range(0, len(msg[2].split("#")[1]), 2):
-            payload.append((int(msg[2].split("#")[1][i:i+2], 16)))
+            canMsg = can.Message(arbitration_id=id,
+                                 data=payload,
+                                 is_extended_id=False)
 
-        canMsg = can.Message(arbitration_id=id,
-                             data=payload,
-                             is_extended_id=False)
-
-        canMsg = can.Message(arbitration_id=0xAA,
-                             data=[0x03],
-                             is_extended_id=False)
-
-        bus.send(canMsg)
+            bus.send(canMsg)
+            time.sleep(0.0001)
