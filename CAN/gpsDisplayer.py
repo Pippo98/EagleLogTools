@@ -65,7 +65,7 @@ if __name__ == "__main__":
         mean_lat, mean_lng = list(map(lambda x: sum(x)/len(x), zip(*loc)))
 
         m = folium.Map(location=[mean_lat, mean_lng],
-                       zoom_start=18, max_zoom=25)
+                       zoom_start=18, max_zoom=25, tiles="OpenStreetMap")
 
         folium.PolyLine(loc,
                         color='red',

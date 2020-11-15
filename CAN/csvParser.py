@@ -250,7 +250,7 @@ if __name__ == "__main__":
                 if timestamp == None or type == None or data == None:
                     continue
 
-                modified = parser.parseCSV(timestamp, type, data)
+                modified = parser.fill_GPS(timestamp, type, data)
 
                 if modified:
                     txt = ""

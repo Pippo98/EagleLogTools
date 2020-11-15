@@ -1,5 +1,6 @@
 import os
 from browseTerminal import terminalBrowser
+home = os.path.expanduser("~")
 
 
 def findAllFiles(path):
@@ -15,7 +16,7 @@ def findAllFiles(path):
     return paths
 
 
-def runParser(startPath="/home/filippo/Desktop/newlogs"):
+def runParser(startPath=os.path.join(home, "Desktop/")):
     path = startPath
 
     tb = terminalBrowser(startPath=path)

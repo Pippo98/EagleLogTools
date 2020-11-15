@@ -26,7 +26,7 @@ mute = threading.Lock()
 
 SIMULATE_STEERING = True
 
-LOG_FILE_MODE = True
+LOG_FILE_MODE = False
 
 TELEMETRY_LOG = False
 VOLANTE_DUMP = False
@@ -66,6 +66,9 @@ for arg in sys.argv[1:]:
         LOG_FILE_MODE = True
         VOLANTE_DUMP = True
 
+    if(arg == "--movie"):
+        ENABLE_MOVIE = True
+
     if(arg == "--def0"):
         ENABLE_DISPLAYER = True
         ENABLE_PRINTING = True
@@ -97,8 +100,8 @@ WIDTH = 1000
 HEIGHT = 700
 movie = 0
 if ENABLE_MOVIE:
-    #movie = cv2.VideoCapture(0)
-    movie = cv2.VideoCapture("udp://10.5.5.9:8554", cv2.CAP_FFMPEG)
+    movie = cv2.VideoCapture(0)
+    #movie = cv2.VideoCapture("udp://10.5.5.9:8554", cv2.CAP_FFMPEG)
     ret, first_frame = movie.read()
     HEIGHT = len(first_frame)
     WIDTH = len(first_frame[0])
@@ -136,7 +139,8 @@ image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 
 START_LINE = 1
 SPEED_UP = 5
-filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER"
+home = os.path.expanduser("~")
+filename = os.path.join(home, "Desktop/CANDUMP_DEFAULT_FOLDER")
 
 
 def init_variables():
@@ -149,12 +153,13 @@ def init_variables():
     # create a csv file for each sensor with all values parsed
     if(CREATE_CSV):
         if(not LOG_FILE_MODE):
-            pathcsv = "/home/filippo/Desktop/defaultRealTimeCSV/"
+            pathcsv = os.path.join(home, "Desktop/defaultRealTimeCSV/")
         else:
             if(TELEMETRY_LOG):
-                pathcsv = "/home/filippo/Desktop/newlogs/2020-11-3_20_3_15/eagle_test/csv"
+                pathcsv = os.path.join(
+                    home, "Desktop/newlogs/2020-11-3_20_3_15/eagle_test/csv")
             else:
-                pathcsv = "/home/filippo/Desktop/defaultCSV/"
+                pathcsv = os.path.join(home, "Desktop/defaultCSV/")
         if(not os.path.isdir(pathcsv)):
             os.mkdir(pathcsv)
         for sensor in parser.sensors:
