@@ -23,7 +23,7 @@ from browseTerminal import terminalBrowser
 parser = Parser.Parser()
 
 VOLANTE_DUMP = True
-PARSE_DUMP = False
+PARSE_DUMP = True
 PARSE_GPS = True
 COMPRESS = True
 
