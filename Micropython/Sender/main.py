@@ -407,10 +407,10 @@ while 1:
     payload = []
     try:
         msg = usb.readline()
-	if(msg == None):
-		continue
+        if(msg == None):
+            continue
 
-	msg = msg.decode("utf-8")
+        msg = msg.decode("utf-8")
         msg = msg.replace("\r\n", "")
         msg = msg.split("\t")
         timestamp = float(msg[0])
@@ -419,20 +419,19 @@ while 1:
         for m in msg[2:]:
             payload.append(int(m))
 
-	counter += 1
+        counter += 1
 
         md = fill_structs(timestamp, id_, payload)
 
         if(time.time() - prevTime > 0.2):
-        	objToSend = []
-		prevTime = time.time()
-		for sensor in sensors:
-			objToSend.append(sensor.get_obj())
-		usb.write(str(counter) + str(objToSend) + "\r\n")
-		counter = 0
+            objToSend = []
+            prevTime = time.time()
+            for sensor in sensors:
+                objToSend.append(sensor.get_obj())
+            usb.write(str(counter) + str(objToSend) + "\r\n")
+            counter = 0
     except KeyboardInterrupt:
         break
     except Exception as e:
-	usb.write(str(e) + "\r\n")
+        usb.write(str(e) + "\r\n")
         continue
-

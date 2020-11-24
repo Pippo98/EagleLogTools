@@ -1,11 +1,16 @@
-import DeviceClasses
 import can
 from serial import Serial
 import time
+import pprint
 
+import DeviceClasses
+import Parser
 
 ser = Serial("/dev/ttyS0", 9600)
 
+parser = Parser.Parser()
+
+pp = pprint.PrettyPrinter(depth=4)
 
 bustype = 'socketcan_native'
 channel = 'vcan0'
@@ -46,11 +51,22 @@ msg = can.Message(arbitration_id=0x0,
 
 if __name__ == "__main__":
 
+    previousTime = time.time()
     while True:
         message = bus.recv()
 
         id = message.arbitration_id
         payload = message.data
-        newMessage = True
-        print(message)
 
+        modifiedSensors = parser.parseMessage(time.time(), id, payload)
+
+        if time.time() - previousTime > 0.2:
+
+            previousTime = time.time()
+
+            _dict = {}
+            for sensor in parser.sensors:
+                _dict[sensor.type] = (sensor.get_dict())
+
+            pp.pprint(_dict)
+            ser.write(str(_dict))
