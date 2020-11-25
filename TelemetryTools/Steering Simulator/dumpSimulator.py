@@ -34,7 +34,7 @@ canMsg = can.Message(arbitration_id=0x0,
                      data=[],
                      is_extended_id=True)
 
-tb = terminalBrowser(startPath="/home/filippo/Desktop")
+tb = terminalBrowser(startPath="/")
 filename = tb.browse()
 
 if __name__ == "__main__":

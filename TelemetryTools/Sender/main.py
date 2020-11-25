@@ -6,7 +6,7 @@ import pprint
 import DeviceClasses
 import Parser
 
-ser = Serial("/dev/ttyS0", 9600)
+ser = Serial("/dev/ttyS0", 115200)
 
 parser = Parser.Parser()
 
@@ -69,4 +69,5 @@ if __name__ == "__main__":
                 _dict[sensor.type] = (sensor.get_dict())
 
             pp.pprint(_dict)
-            ser.write(str(_dict))
+            ser.write((str(_dict) + "\r\n").encode())
+
