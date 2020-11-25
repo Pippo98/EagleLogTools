@@ -6,7 +6,12 @@ import pprint
 import DeviceClasses
 import Parser
 
-ser = Serial("/dev/ttyS0", 115200)
+
+###
+import json
+import ast
+
+#ser = Serial("/dev/ttyS0", 115200)
 
 parser = Parser.Parser()
 
@@ -52,6 +57,9 @@ msg = can.Message(arbitration_id=0x0,
 if __name__ == "__main__":
 
     previousTime = time.time()
+
+    temp = open("/home/filippo/Desktop/f1.txt", "w")
+
     while True:
         message = bus.recv()
 
@@ -60,7 +68,7 @@ if __name__ == "__main__":
 
         modifiedSensors = parser.parseMessage(time.time(), id, payload)
 
-        if time.time() - previousTime > 0.2:
+        if time.time() - previousTime > 0.1:
 
             previousTime = time.time()
 
@@ -69,5 +77,17 @@ if __name__ == "__main__":
                 _dict[sensor.type] = (sensor.get_dict())
 
             pp.pprint(_dict)
-            ser.write((str(_dict) + "\r\n").encode())
+            #ser.write((str(_dict) + "\r\n").encode())
 
+            # before we encode all sensors in a string to be sent in serial
+            # now we have to decode that string ad fill each "sensor" with the data contained in the string
+            dt = str(_dict)
+            temp.write(dt + "\r\n")
+
+            '''
+            #newDict = json.loads(dt)
+            newDict = ast.literal_eval(dt)
+            for sensor in parser.sensors:
+                print(newDict[sensor.type])
+                sensor.__dict__.update(newDict[sensor.type])
+            '''
