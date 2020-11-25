@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     previousTime = time.time()
 
-    temp = open("/home/filippo/Desktop/f1.txt", "w")
+    #temp = open("/home/filippo/Desktop/f1.txt", "w")
 
     while True:
         message = bus.recv()
@@ -77,14 +77,14 @@ if __name__ == "__main__":
                 _dict[sensor.type] = (sensor.get_dict())
 
             pp.pprint(_dict)
-            #ser.write((str(_dict) + "\r\n").encode())
+            ser.write((str(_dict) + "\r\n").encode())
 
             # before we encode all sensors in a string to be sent in serial
             # now we have to decode that string ad fill each "sensor" with the data contained in the string
+            '''
             dt = str(_dict)
             temp.write(dt + "\r\n")
 
-            '''
             #newDict = json.loads(dt)
             newDict = ast.literal_eval(dt)
             for sensor in parser.sensors:
