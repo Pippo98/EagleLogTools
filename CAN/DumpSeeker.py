@@ -92,6 +92,7 @@ if __name__ == "__main__":
             timestamp, id, payload = parseMessage(line)
             parser.parseMessage(timestamp, id, payload)
 
+        sensorsLines = []
         for sensor in parser.sensors:
             if sensor.type == "Commands":
                 # Changing from absolute timestamp to relative timestamp
@@ -99,8 +100,16 @@ if __name__ == "__main__":
                     sensor.active_commands[i] = (cmds[0], cmds[1] - startTime)
                 displayer.displayCommands(sensor)
                 sensor.clear()
-            if sensor.type == "Accel":
-                displayer.displayAccel(sensor)
+            else:
+                text = sensor.type + ": "
+                objs, names = sensor.get_obj()
+                for i, obj in enumerate(objs):
+                    if(type(obj) == float):
+                        obj = round(obj, 2)
+                    text += names[i] + ": " + str(obj) + "\t"
+                sensorsLines.append(text)
+
+        displayer.displaySensors(sensorsLines)
 
         displayer.DebugMessage(
             "Looking to lines between {} and {}... total lines: {}, current time: {} total time: {}".format(dwIdx, upIdx, len(lines), round(timestamp - startTime, 3), round(duration, 3)))
