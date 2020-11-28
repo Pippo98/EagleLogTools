@@ -13,13 +13,13 @@ import numpy as np
 import serial.tools.list_ports as lst
 from termcolor import colored, cprint
 
+import zlib
 
 import Parser
 import DeviceClasses
 from Display_Car import *
 from telemetryParser import *
 from browseTerminal import terminalBrowser
-
 
 parser = Parser.Parser()
 
@@ -391,14 +391,13 @@ if __name__ == "__main__":
     offset_time = 0
 
     if(not LOG_FILE_MODE):
-        if(not JSON_TYPE):
-            if find_Stm() != 0:
-                dev, name = find_Stm()
-                print("Opening {}".format(name))
-                open_device(dev)
-            else:
-                print("no STM32 Detected, Exit_Program")
-                exit(0)
+        if find_Stm() != 0:
+            dev, name = find_Stm()
+            print("Opening {}".format(name))
+            open_device(dev)
+        else:
+            print("no STM32 Detected, Exit_Program")
+            exit(0)
 
     if(LOG_FILE_MODE):
         fil = open(filename, 'r')
@@ -422,9 +421,10 @@ if __name__ == "__main__":
     id = None
     payload = None
 
-    temp = open("/home/filippo/Desktop/f1.txt", "r")
-    lines = temp.readlines()
-    newDict = ast.literal_eval(lines.pop())
+    #temp = open("/home/filippo/Desktop/f1.txt", "r")
+    #lines = temp.readlines()
+    #newDict = ast.literal_eval(lines.pop())
+    newDict = None
 
     while True:
         if Pause:
@@ -455,9 +455,14 @@ if __name__ == "__main__":
             #     continue
         if(not LOG_FILE_MODE):
             if(JSON_TYPE):
-                line = lines.pop()
-                newDict = ast.literal_eval(line)
-                time.sleep(0.01)
+                #line = lines.pop()
+                message = ser.readline().decode("utf-8")
+                try:
+                    newDict = ast.literal_eval(str(message))
+                except Exception as e:
+                    print(message)
+                    print(e)
+                    continue
             else:
                 try:
                     msg = str(ser.readline(), 'ascii')
@@ -474,8 +479,10 @@ if __name__ == "__main__":
 
         if(not TELEMETRY_LOG):
             if(JSON_TYPE):
+                ks = newDict.keys()
                 for sensor in parser.sensors:
-                    sensor.__dict__.update(newDict[sensor.type])
+                    if(sensor.type in ks):
+                        sensor.__dict__.update(newDict[sensor.type])
                 modifiedSensors = parser.sensors
             else:
                 modifiedSensors = parser.parseMessage(timestamp, id, payload)

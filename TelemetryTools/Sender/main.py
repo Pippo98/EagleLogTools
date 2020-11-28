@@ -1,3 +1,5 @@
+import ast
+import json
 import can
 from serial import Serial
 import time
@@ -6,34 +8,78 @@ import pprint
 import DeviceClasses
 import Parser
 
+import subprocess
+subprocess.run("chmod 777 /dev/ttyS0")
 
 ###
-import json
-import ast
 
-#ser = Serial("/dev/ttyS0", 115200)
+currentBaud = 9600
+
+ser = Serial("/dev/ttyS0", currentBaud)
 
 parser = Parser.Parser()
 
 pp = pprint.PrettyPrinter(depth=4)
 
 bustype = 'socketcan_native'
-channel = 'vcan0'
+channel = 'can0'
 bus = can.interface.Bus(channel=channel, bustype=bustype)
 
-''' 
-bus.recv()
-bus.send()
+antennaConfig = {
+    "baud": "9600",
+    "channel": "1",
+    "fu": "03",
+    "power": "20"
+}
 
-message.Name
-message.ts
-message.arbitration_id
-message.dlc
-message.data
-message.error
-message.extended
-message.remote
-'''
+
+def initializeAntenna():
+
+    print("Antenna Initial STATUS")
+
+    ser.write("AT".encode())
+    print(ser.readline())
+    ser.write("AT+RB".encode())
+    print(ser.readline())
+    ser.write("AT+RC".encode())
+    print(ser.readline())
+    ser.write("AT+RF".encode())
+    print(ser.readline())
+    ser.write("AT+RP".encode())
+    print(ser.readline())
+
+    print("\r\n\n\n")
+    print("SENDING CONFIG")
+    print("\r\n")
+
+    ser.write(("AT+B" + antennaConfig["baud"]).encode())
+    ser.write(("AT+C" + antennaConfig["channel"]).encode())
+    ser.write(("AT+P" + antennaConfig["power"]).encode())
+    ser.write(("AT+F" + antennaConfig["fu"]).encode())
+
+    print("\r\nDONE")
+
+    print("Antenna Final STATUS")
+
+    ser.write("AT".encode())
+    print(ser.readline())
+    ser.write("AT+RB".encode())
+    print(ser.readline())
+    ser.write("AT+RC".encode())
+    print(ser.readline())
+    ser.write("AT+RF".encode())
+    print(ser.readline())
+    ser.write("AT+RP".encode())
+    print(ser.readline())
+
+    ser.write("AT".encode())
+    print(ser.readline())
+
+
+# initializeAntenna()
+ser.close()
+currentBaud = int(antennaConfig["baud"])
+ser = Serial("/dev/ttyS0", currentBaud)
 
 newMessage = False
 id = 0
@@ -68,12 +114,14 @@ if __name__ == "__main__":
 
         modifiedSensors = parser.parseMessage(time.time(), id, payload)
 
-        if time.time() - previousTime > 0.1:
+        if time.time() - previousTime > 1:
 
             previousTime = time.time()
 
             _dict = {}
             for sensor in parser.sensors:
+                if(sensor.type == "GPS"):
+                    continue
                 _dict[sensor.type] = (sensor.get_dict())
 
             pp.pprint(_dict)
