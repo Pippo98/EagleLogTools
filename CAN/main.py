@@ -5,10 +5,11 @@ import cv2
 import sys
 import ast
 import time
+import queue
+import signal
 import getch
 import serial
 import threading
-import queue
 import numpy as np
 import serial.tools.list_ports as lst
 from termcolor import colored, cprint
@@ -17,15 +18,19 @@ import zlib
 
 import Parser
 import DeviceClasses
+import cursesDisplayer
 from Display_Car import *
 from telemetryParser import *
 from browseTerminal import terminalBrowser
 
 parser = Parser.Parser()
+displayer = cursesDisplayer.Curses()
+tb = terminalBrowser()
 
 newImage = threading.Event()
-
 mute = threading.Lock()
+runningThreads = []
+STOP_THREADS = threading.Event()
 #################################################################################
 
 SIMULATE_STEERING = False
@@ -36,14 +41,11 @@ TELEMETRY_LOG = False
 VOLANTE_DUMP = False
 JSON_TYPE = True
 
-CREATE_CSV = False
-
 Pause = False
 ENABLE_MOVIE = False
 
 ENABLE_PRINTING = False
 ENABLE_DISPLAYER = True
-
 
 #################################################################################
 
@@ -80,14 +82,14 @@ for arg in sys.argv[1:]:
         LOG_FILE_MODE = False
         TELEMETRY_LOG = False
         VOLANTE_DUMP = False
-        CREATE_CSV = False
+        JSON_TYPE = False
     if(arg == "--def1"):
         ENABLE_DISPLAYER = False
         ENABLE_PRINTING = False
         LOG_FILE_MODE = True
         TELEMETRY_LOG = False
         VOLANTE_DUMP = True
-        CREATE_CSV = True
+        JSON_TYPE = False
     if(arg == "--def2"):
         ENABLE_DISPLAYER = True
         ENABLE_PRINTING = True
@@ -95,7 +97,7 @@ for arg in sys.argv[1:]:
         TELEMETRY_LOG = False
         VOLANTE_DUMP = True
         ENABLE_MOVIE = False
-        CREATE_CSV = False
+        JSON_TYPE = False
 
 
 ''' IMAGE '''
@@ -103,7 +105,7 @@ for arg in sys.argv[1:]:
 Window_Name = ""
 WIDTH = 1000
 HEIGHT = 700
-movie = 0
+movie = None
 if ENABLE_MOVIE:
     movie = cv2.VideoCapture(0)
     # movie = cv2.VideoCapture("udp://10.5.5.9:8554", cv2.CAP_FFMPEG)
@@ -141,8 +143,10 @@ analysis_duration = 0.2
 
 image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 
+SHIFT_TIME = 0
+SHIFT_START_TIME = 0
 START_LINE = 1
-SPEED_UP = 5
+SPEED_UP = 2
 home = os.path.expanduser("~")
 filename = os.path.join(home, "Desktop/CANDUMP_DEFAULT_FOLDER")
 
@@ -151,26 +155,10 @@ def init_variables():
     global filename, Window_Name
 
     if LOG_FILE_MODE:
-        tb = terminalBrowser(startPath=filename)
+        tb.currentPath = filename
         filename = tb.browse()
-
-    # create a csv file for each sensor with all values parsed
-    if(CREATE_CSV):
-        if(not LOG_FILE_MODE):
-            pathcsv = os.path.join(home, "Desktop/defaultRealTimeCSV/")
-        else:
-            if(TELEMETRY_LOG):
-                pathcsv = os.path.join(
-                    home, "Desktop/newlogs/2020-11-3_20_3_15/eagle_test/csv")
-            else:
-                pathcsv = os.path.join(home, "Desktop/defaultCSV/")
-        if(not os.path.isdir(pathcsv)):
-            os.mkdir(pathcsv)
-        for sensor in parser.sensors:
-            sensor.file_ = open(pathcsv + "/" + sensor.type + ".csv", "w")
-            obj, names = sensor.get_obj()
-            csvDescriptorLine = "timestamp" + ";" + ";".join(names) + "\n"
-            sensor.file_.write(csvDescriptorLine)
+        if filename == None:
+            quit("No files/folders selected", "")
 
     if(LOG_FILE_MODE and TELEMETRY_LOG):
         filename = runParser()
@@ -254,138 +242,115 @@ def parse_message(msg):
 
 def displaySensors(name, background):
     # global image, BACKGROUND, sensors, imageToDisplay
-    global imageToDisplay, newImage
+    global imageToDisplay, newImage, STOP_THREADS, movie
 
-    image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
-    for i, sensor in enumerate(parser.sensors):
-        if(sensor.type == "Accel"):
-            image = display_accel(image, 1, parser.a)
-        if(sensor.type == "Gyro"):
-            image = display_gyro(image, 1, parser.g)
-        if(sensor.type == "Accel IZZE"):
-            image = display_accel(image, 2, parser.a2)
-        if(sensor.type == "Gyro IZZE"):
-            image = display_gyro(image, 2, parser.g2)
-        if(sensor.type == "Pedals"):
-            image = display_apps(image, parser.pedals)
-            image = display_brake(image, parser.pedals)
-        if(sensor.type == "Steer"):
-            image = display_steer(image, parser.steer)
-        if(sensor.type == "Speed"):
-            image = display_enc(image, parser.speed)
-        if(sensor.type == "BMS LV"):
-            image = display_BMS_LV(
-                image, parser.bmsLV.voltage, parser.bmsLV.temperature)
-        if(sensor.type == "BMS HV"):
-            image = display_BMS_HV(
-                image, parser.bmsHV.voltage, parser.bmsHV.current, parser.bmsHV.temperature)
-        if(sensor.type == "Inverter Right"):
-            image = display_inverter(
-                image, parser.invl.speed, parser.invr.speed, parser.invl.torque, parser.invr.torque)
+    frameRateTime = time.time()
+    BACKGROUND = background
 
-        if(sensor.type == "Commands"):
-            objs, _ = sensor.get_obj()
-            image = display_command(image, objs)
-
-            for i, obj in enumerate(objs):
-                if(time.time() - obj[1] > 2):
-                    sensor.remove_command()
-
-    if(LOG_FILE_MODE):
-        image = display_log_time(
-            image, log_start_time, log_end_time, timestamp-offset_time)
-
-    mute.acquire()
-    idxs = image[:, :, 3] > 0
-    background[idxs] = image[idxs]
-
-    newImage.set()
-    imageToDisplay = background
-    # imagesQueue.put(background)
-    mute.release()
-
-
-###################################################################
-############################### CSV ###############################
-###################################################################
-def parse_and_CSV():
-    print("START CSV PARSING")
-    fil = open(filename, 'r')
-    lines = fil.readlines()[START_LINE:]
-    for line in lines:
-        timestamp, id, payload = parse_message(line)
-        if(not TELEMETRY_LOG):
-            modifiedSensors = parser.parseMessage(timestamp, id, payload)
+    while not STOP_THREADS.is_set():
+        # Dispaying Image with all data every 0.3 sec
+        if not movie == None:
+            ret, frame = movie.read()
+            BACKGROUND = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
         else:
-            modifiedSensors = parser.parseCSV(
-                timestamp, id, payload)
+            if(time.time() - frameRateTime > 1/framerate):
+                frameRateTime = time.time()
+                BACKGROUND[:, :] = BACKGROUND_COLOR
+            else:
+                continue
 
-        for sensor in parser.sensors:
-            if(sensor.type in modifiedSensors):
-                txt = ""
-                obj, names = sensor.get_obj()
-                csvline = str(sensor.time) + ";"
-                for i, e in enumerate(obj):
-                    csvline += str(e) + ";"
-                sensor.file_.write(csvline + "\n")
+        image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
+        for i, sensor in enumerate(parser.sensors):
+            if(sensor.type == "Accel"):
+                image = display_accel(image, 1, parser.a)
+            if(sensor.type == "Gyro"):
+                image = display_gyro(image, 1, parser.g)
+            if(sensor.type == "Accel IZZE"):
+                image = display_accel(image, 2, parser.a2)
+            if(sensor.type == "Gyro IZZE"):
+                image = display_gyro(image, 2, parser.g2)
+            if(sensor.type == "Pedals"):
+                image = display_apps(image, parser.pedals)
+                image = display_brake(image, parser.pedals)
+            if(sensor.type == "Steer"):
+                image = display_steer(image, parser.steer)
+            if(sensor.type == "Speed"):
+                image = display_enc(image, parser.speed)
+            if(sensor.type == "BMS LV"):
+                image = display_BMS_LV(
+                    image, parser.bmsLV.voltage, parser.bmsLV.temperature)
+            if(sensor.type == "BMS HV"):
+                image = display_BMS_HV(
+                    image, parser.bmsHV.voltage, parser.bmsHV.current, parser.bmsHV.temperature)
+            if(sensor.type == "Inverter Right"):
+                image = display_inverter(
+                    image, parser.invl.speed, parser.invr.speed, parser.invl.torque, parser.invr.torque)
 
-    print("END")
+            if(sensor.type == "Commands"):
+                objs, _ = sensor.get_obj()
+                image = display_command(image, objs)
+
+                for i, obj in enumerate(objs):
+                    if(time.time() - obj[1] > 2):
+                        sensor.remove_command()
+
+        if(LOG_FILE_MODE):
+            image = display_log_time(
+                image, log_start_time, log_end_time, timestamp-offset_time)
+
+        mute.acquire()
+        idxs = image[:, :, 3] > 0
+        BACKGROUND[idxs] = image[idxs]
+
+        newImage.set()
+        imageToDisplay = BACKGROUND
+        mute.release()
+        time.sleep(0.001)
+
+
+def quit(signal, frame):
+    print('QUITTING')
+
+    STOP_THREADS.set()
+    time.sleep(0.01)
+    for thread in runningThreads:
+        thread.join()
+
+    tb.quit("", "")
+
+    try:
+        displayer.quit()
+    except:
+        pass
+
+    if(signal == 2):
+        print("CTRL+C")
+    else:
+        print(signal)
+    print(frame)
+    cv2.destroyAllWindows()
+    exit(0)
+
+
+def createDisplayerRectangles():
+    displayer.addRectangle("cmd", (0, 0), (50, 20))
+
+    displayer.addRectangle(
+        "debug", (0, displayer.lines - 4), (displayer.cols, displayer.lines))
+
+    displayer.addRectangleRelativeTo("cmd", "sensors", displayer.Reference.RIGHT,
+                                     displayer.Alignment.TOP_BOTTOM, height=None, width=220)
+
+
+signal.signal(signal.SIGINT, quit)
 
 ###################################################################
 ############################## MAIN ###############################
 ###################################################################
 
-
-def simulateSteeringWheel():
-    while True:
-        key = getch.getch()
-        if key == "1":
-            print("Sending BmsHV ON")
-
-            ser.write("160 003 000 000 000 000 000 000 000\n".encode())
-
-            print("DONE")
-        if key == "2":
-            print("Sending INVL ON")
-
-            ser.write("160 008 000 000 000 000 000 000 000\n".encode())
-
-            time.sleep(1)
-
-            print("Sending INVR ON")
-            ser.write("160 009 000 000 000 000 000 000 000\n".encode())
-
-            print("DONE")
-
-        if key == "3":
-            print("Sending RUN")
-
-            ser.write("160 005 000 000 000 000 000 000 000\n".encode())
-            print("DONE")
-
-        if key == "0":
-            print("Sending STOP")
-
-            ser.write("160 004 000 000 000 000 000 000 000\n".encode())
-            print("DONE")
-
-        if key == "9":
-            print("nu")
-
-            ser.write("162 000 000 000 000 000 000 000 000\n".encode())
-
-            print("DONE")
-
-        if key == "q":
-            exit(0)
-
-
 if __name__ == "__main__":
 
     init_variables()
-
-    if(LOG_FILE_MODE and CREATE_CSV):
-        parse_and_CSV()
 
     line = ""
     offset_time = 0
@@ -396,8 +361,7 @@ if __name__ == "__main__":
             print("Opening {}".format(name))
             open_device(dev)
         else:
-            print("no STM32 Detected, Exit_Program")
-            exit(0)
+            quit("no STM32 Detected, Exit_Program", "")
 
     if(LOG_FILE_MODE):
         fil = open(filename, 'r')
@@ -408,14 +372,10 @@ if __name__ == "__main__":
         log_start_time = parse_message(lines[START_LINE])[0]
         log_end_time = parse_message(lines[-1])[0]
 
-    print("Start analizing CAN messages")
-    start_time = time.time()
+    #print("Start analizing CAN messages")
+    start_time = time.time() - analysis_duration
     frameRateTime = time.time()
     dt = time.time()
-
-    ###################################################################
-    ############################## WHILE ##############################
-    ###################################################################
 
     timestamp = None
     id = None
@@ -425,34 +385,43 @@ if __name__ == "__main__":
     #lines = temp.readlines()
     #newDict = ast.literal_eval(lines.pop())
     newDict = None
+    currentLineIdx = 0
 
+    if ENABLE_PRINTING:
+        displayer.initScreen()
+        createDisplayerRectangles()
+        displayer.drawBoundingBoxes(Title=True)
+
+    t = threading.Thread(target=displaySensors,
+                         args=("None", BACKGROUND,))
+    t.start()
+    runningThreads.append(t)
+
+    ###################################################################
+    ############################## WHILE ##############################
+    ###################################################################
     while True:
         if Pause:
             key = cv2.waitKey(1)
             if key == 27:  # EXIT
                 print("\n")
-                exit(0)
+                quit("PRESSED ESC", "")
             if key == 32:  # SPACEBAR
                 Pause = not Pause
-            continue
+            else:
+                continue
 
         if(LOG_FILE_MODE):
             try:
-                line = lines.pop(0)
+                line = lines[currentLineIdx]
+                currentLineIdx += 1
             except IndexError:
-                print("#"*separator_count)
-                print("#"*separator_count)
-                print("#"*separator_count)
-
-                print("LOG FILE ENDED")
-                exit(0)
-            except KeyboardInterrupt:
-                exit(0)
+                quit("LOG FILE ENDED", "")
             timestamp, id, payload = parse_message(line)
             if(payload == None):
                 continue
-            # while((timestamp - offset_time) / SPEED_UP > time.time() - dt):
-            #     continue
+            while((timestamp - offset_time) / SPEED_UP > time.time() - dt):
+                continue
         if(not LOG_FILE_MODE):
             if(JSON_TYPE):
                 #line = lines.pop()
@@ -460,15 +429,12 @@ if __name__ == "__main__":
                 try:
                     newDict = ast.literal_eval(str(message))
                 except Exception as e:
-                    print(message)
-                    print(e)
+                    displayer.DebugMessage(message)
                     continue
             else:
                 try:
                     msg = str(ser.readline(), 'ascii')
                     timestamp, id, payload = parse_message(msg)
-                except KeyboardInterrupt:
-                    exit(0)
                 except:
                     continue
 
@@ -491,44 +457,10 @@ if __name__ == "__main__":
             modifiedSensors = parser.parseCSV(timestamp, id, payload)
 
         ###################################################################
-        ############################### CSV ###############################
-        ###################################################################
-
-        if(not len(modifiedSensors) == 0 and not LOG_FILE_MODE and CREATE_CSV):
-            for sensor in parser.sensors:
-                if(sensor.type in modifiedSensors):
-                    txt = ""
-                    obj, names = sensor.get_obj()
-                    csvline = str(sensor.time) + ";"
-                    for i, e in enumerate(obj):
-                        csvline += str(e) + ";"
-                    sensor.file_.write(csvline + "\n")
-
-        ###################################################################
-        ########################### ANALYSIS DATA #########################
+        ########################### ANALYSIS PRINT ########################
         ###################################################################
 
         if(time.time() - start_time >= analysis_duration):
-
-            # PRINT SENSORS DATA
-            for sensor in parser.sensors:
-
-                if(sensor.type == "Commands"):
-                    continue
-
-                to_print_lines.append(separator2 * int((separator_count-len(sensor.type))/2) +
-                                      sensor.type + separator2 * int((separator_count-len(sensor.type))/2))
-
-                to_print_lines.append("Messages" + separator3 * int(separator_count - len(
-                    "Messages") - len(str(sensor.count))) + str(sensor.count))
-
-                obj, names = sensor.get_obj()
-                for i, e in enumerate(obj):
-                    to_print_lines.append(
-                        names[i] + separator3 * int(separator_count - len(names[i]) - len(str(e))) + str(e))
-
-                sensor.count = 0
-            to_print_lines.append(separator2 * separator_count)
 
             # PRINT GENERAL CAN DATA
             to_print_lines.append("Messages: {}".format(tot_msg))
@@ -541,18 +473,31 @@ if __name__ == "__main__":
             tot_msg = 0
             start_time = time.time()
 
-        ###################################################################
-        ########################### ANALYSIS PRINT ########################
-        ###################################################################
+            sensorsLines = []
+            for sensor in parser.sensors:
+                if sensor.type == "Commands":
+                    # Changing from absolute timestamp to relative timestamp
+                    for i, cmds in enumerate(sensor.active_commands):
+                        sensor.active_commands[i] = (
+                            cmds[0], cmds[1] - offset_time)
+                    displayer.displayCommands(sensor)
+                    sensor.clear()
+                else:
+                    text = []
+                    text.append(sensor.type + ": ")
+                    objs, names = sensor.get_obj()
+                    for i, obj in enumerate(objs):
+                        if(type(obj) == float):
+                            obj = round(obj, 2)
+                        text.append(names[i] + ": " + str(obj))
+                    sensorsLines.append(text)
 
-        if ENABLE_PRINTING:
-            # Print lines after clearing terminal
-            if(len(to_print_lines) > 0):
-                print(("\033[F" + " "*separator_count) * (prev_line_count+1))
-                for line in to_print_lines:
-                    print(line)
-                prev_line_count = len(to_print_lines)
-                to_print_lines = []
+            displayer.clearAreas()
+            displayer.displayTable("sensors", sensorsLines, maxCols=5)
+            if LOG_FILE_MODE:
+                displayer.DebugMessage("Looking to line {} ... total lines: {}, current time: {} total time: {}".format(
+                    currentLineIdx, len(lines), round(timestamp - offset_time, 3), round(log_end_time - log_start_time, 3)))
+            displayer.refresh()
 
         ###################################################################
         ############################# UI THREAD ###########################
@@ -565,25 +510,10 @@ if __name__ == "__main__":
 
                 key = cv2.waitKey(1)
                 if key == 27:  # EXIT
-                    print("\n")
-                    cv2.destroyAllWindows()
-                    exit(0)
+                    quit("PRESSED ESC", "")
                 if key == 32:  # SPACEBAR
+                    SHIFT_START_TIME = time.time()
                     Pause = not Pause
-
-            # Dispaying Image with all data every 0.3 sec
-            if(time.time() - frameRateTime > 1/framerate):
-                frameRateTime = time.time()
-
-                if(ENABLE_MOVIE):
-                    ret, frame = movie.read()
-                    BACKGROUND = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
-                else:
-                    BACKGROUND[:, :] = BACKGROUND_COLOR
-
-                t = threading.Thread(target=displaySensors,
-                                     args=("None", BACKGROUND,))
-                t.start()
 
 
 ser.close()

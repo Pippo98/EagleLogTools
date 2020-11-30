@@ -56,6 +56,17 @@ def quit(signal, frame):
 
 signal.signal(signal.SIGINT, quit)
 
+
+def createDisplayerRectangles():
+
+    displayer.addRectangle("cmd", (0, 0), (50, 20))
+
+    displayer.addRectangleRelativeTo("cmd", "sensors", displayer.Reference.RIGHT,
+                                     displayer.Alignment.TOP_BOTTOM, height=None, width=220)
+    displayer.addRectangle(
+        "debug", (0, displayer.lines - 4), (displayer.cols, displayer.lines))
+
+
 if __name__ == "__main__":
     fil = open(filename, 'r')
     lines = fil.readlines()
@@ -64,6 +75,8 @@ if __name__ == "__main__":
 
     # Initializing displayer
     displayer.initScreen()
+    createDisplayerRectangles()
+    displayer.drawBoundingBoxes()
 
     upIdx = ToReadMessages
     dwIdx = 0
@@ -77,16 +90,24 @@ if __name__ == "__main__":
                 upIdx = len(lines)
                 dwIdx = len(lines) - ToReadMessages
             else:
-                upIdx += ToReadMessages
                 dwIdx += ToReadMessages
+                upIdx = dwIdx + ToReadMessages
 
         if(key == "KEY_LEFT"):
             if(dwIdx - ToReadMessages < 0):
                 upIdx = ToReadMessages
                 dwIdx = 0
             else:
-                upIdx -= ToReadMessages
                 dwIdx -= ToReadMessages
+                upIdx = dwIdx + ToReadMessages
+
+        if(key == "KEY_UP"):
+            ToReadMessages += 250
+            upIdx = dwIdx + ToReadMessages
+        if(key == "KEY_DOWN"):
+            if(ToReadMessages > 250):
+                ToReadMessages -= 250
+                upIdx = dwIdx + ToReadMessages
 
         for line in lines[dwIdx: upIdx]:
             timestamp, id, payload = parseMessage(line)
@@ -101,15 +122,16 @@ if __name__ == "__main__":
                 displayer.displayCommands(sensor)
                 sensor.clear()
             else:
-                text = sensor.type + ": "
+                text = []
+                text.append(sensor.type + ": ")
                 objs, names = sensor.get_obj()
                 for i, obj in enumerate(objs):
                     if(type(obj) == float):
                         obj = round(obj, 2)
-                    text += names[i] + ": " + str(obj) + "\t"
+                    text.append(names[i] + ": " + str(obj))
                 sensorsLines.append(text)
 
-        displayer.displaySensors(sensorsLines)
+        displayer.displayTable("sensors", sensorsLines, maxCols=5)
 
         displayer.DebugMessage(
-            "Looking to lines between {} and {}... total lines: {}, current time: {} total time: {}".format(dwIdx, upIdx, len(lines), round(timestamp - startTime, 3), round(duration, 3)))
+            "Looking to lines between {} and {} ({}) ... total lines: {}, current time: {} total time: {}".format(dwIdx, upIdx, ToReadMessages, len(lines), round(timestamp - startTime, 3), round(duration, 3)))
