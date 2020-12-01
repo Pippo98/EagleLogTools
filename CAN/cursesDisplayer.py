@@ -1,6 +1,6 @@
-import sty
 import time
 import curses
+import threading
 
 import Colors
 import CoordinateManager
@@ -19,6 +19,7 @@ TITLE = 1
 ERROR = 2
 ACCENT = 3
 WARNING = 4
+SELECTION = 5
 
 
 class Curses:
@@ -26,6 +27,7 @@ class Curses:
     padding = 8
 
     boxes = {}
+    printTitles = True
 
     def __init__(self):
         self.screen = None
@@ -41,8 +43,12 @@ class Curses:
     def initScreen(self):
         self.screen = self.c.initscr()
         self.screen.keypad(True)
-        self.lines, self.cols = self.c.LINES, self.c.COLS
+        self.c.curs_set(0)
+        self.c.mousemask(-1)
+
         self.c.start_color()
+
+        self.lines, self.cols = self.c.LINES, self.c.COLS
 
         self.cm.minX = 1
         self.cm.maxX = self.cols - 2
@@ -57,31 +63,81 @@ class Curses:
         self.c.init_pair(WARNING, 22, self.c.COLOR_BLACK)
         self.c.init_color(23, 0, 1000, 1000)
         self.c.init_pair(ACCENT, 23, self.c.COLOR_BLACK)
+        self.c.init_color(24, 500, 800, 1000)
+        self.c.init_pair(SELECTION, 24, self.c.COLOR_BLACK)
 
     def addRectangleRelativeTo(self, referenceID, newID, referenceType, alignmentType, height=None, width=None):
-        self.cm.addRelativeTo(referenceID, newID, referenceType,
-                              alignmentType, height=height, width=width)
-        self.boxes = self.cm.getRectangles()
+        rect = self.cm.addRelativeTo(referenceID, newID, referenceType,
+                                     alignmentType, height=height, width=width)
+        self.createRectangleItem(newID, rect)
 
     def addRectangle(self, ID, upLeft, bottomRight):
-        self.cm.addRect(ID, upLeft, bottomRight)
-        self.boxes = self.cm.getRectangles()
+        rect = self.cm.addRect(ID, upLeft, bottomRight)
 
-    def initPositions(self):
+        self.createRectangleItem(ID, rect)
 
-        self.cm.addRect("cmd", (0, 0), (50, 20))
+    def handleMouse(self):
+        id, x, y, _, event = self.c.getmouse()
+        rect = self.cm.checkIfInRect((x, y))
+        if not rect == None:
+            event = "UP" if event == 134217728 else event
+            event = "DOWN" if event == 524288 else event
 
-        self.cm.addRelativeTo("cmd", "sensors", self.cm.Reference.RIGHT,
-                              self.cm.Alignment.TOP_BOTTOM, height=None, width=220)
-        self.cm.addRelativeTo("cmd", "debug", self.cm.Reference.BOTTOM,
-                              self.cm.Alignment.LEFT_RIGHT, height=10,  width=220)
-        self.cm.addRect("debug", (0, self.lines - 4), (self.cols, self.lines))
+            selected = self.boxes[rect]["selected"]
 
-        self.boxes = self.cm.getRectangles()
+            if event == 2 or event == 4:
 
-    def drawBoundingBoxes(self, Title=False):
+                selected = not selected
+
+                self.clearSelections()
+
+            scrollLines = 4
+            if event == "UP":
+                self.boxes[rect]["scrollIndex"] += scrollLines
+            elif event == "DOWN":
+                if self.boxes[rect]["scrollIndex"] - scrollLines >= 0:
+                    self.boxes[rect]["scrollIndex"] -= scrollLines
+
+            self.boxes[rect]["selected"] = selected
+            self.boxes[rect]["event"] = event
+            self.boxes[rect]["point"] = (x, y)
+
+            self.updateRectangles()
+            self.updateText(rect)
+
+    def updateText(self, ID):
+        if self.boxes[ID]["text"] == None:
+            return
+        self.clearRectangle(ID)
+        self.writeLines(ID, self.boxes[ID]["text"],
+                        startIndex=self.boxes[ID]["scrollIndex"])
+
+    def setText(self, ID, lines):
+        self.boxes[ID]["text"] = lines
+        self.boxes[ID]["scrollIndex"] = 0
+
+        self.updateText(ID)
+
+    def createRectangleItem(self, ID, rect):
+        self.boxes[ID] = {}
+
+        self.boxes[ID]["ul"] = rect["ul"]
+        self.boxes[ID]["br"] = rect["br"]
+        self.boxes[ID]["selected"] = False
+        self.boxes[ID]["event"] = None
+        self.boxes[ID]["point"] = (None, None)
+        self.boxes[ID]["scrollIndex"] = 0
+        self.boxes[ID]["text"] = None
+
+    def clearSelections(self):
+        for ID in self.boxes.keys():
+            self.boxes[ID]["selected"] = False
+            self.boxes[ID]["event"] = None
+            self.boxes[ID]["point"] = (None, None)
+
+    def drawBoundingBoxes(self):
         for key, value in self.boxes.items():
-            if not Title == None:
+            if not self.printTitles == False:
                 self.rectangle(value["ul"], value["br"], key.upper())
             else:
                 self.rectangle(value["ul"], value["br"])
@@ -94,11 +150,23 @@ class Curses:
         self.screen.keypad(False)
         self.c.endwin()
 
-    def getChar(self):
+    def getKey(self, blocking=True):
+        if(blocking):
+            self.c.cbreak()
+        else:
+            self.c.nocbreak()
+
         posX, posY = self.cm.rectangles["debug"]["ul"][0] + \
             1, self.cm.rectangles["debug"]["ul"][1] + 2
         key = self.screen.getkey(posY, posX)
         return key
+
+    def getChar(self, blocking=True):
+        if not blocking:
+            self.screen.nodelay(True)
+        else:
+            self.screen.nodelay(False)
+        return self.screen.getch()
 
     def displayCommands(self, commands):
         for i, command in enumerate(commands.active_commands):
@@ -174,12 +242,39 @@ class Curses:
 
             currentLine += lineBreak + 1
 
+    def writeLines(self, ID, lines, startIndex=0):
+        x = self.boxes[ID]["ul"][0] + 1
+        y = self.boxes[ID]["ul"][1] + 1
+
+        maxY = self.boxes[ID]["br"][1] - 1
+
+        if(startIndex > len(lines)):
+            startIndex = len(lines)
+
+        for i, line in enumerate(lines[startIndex:]):
+            if(y + i > maxY):
+                break
+            line = line.strip()
+            self.screen.addstr(y + i, x, line)
+
+        # Drawing scroll indicator
+        scrollPercentage = startIndex / len(lines)
+        x = self.boxes[ID]["br"][0] - 2
+        y1 = self.boxes[ID]["ul"][1] + 1
+        y2 = self.boxes[ID]["br"][1] - 1
+
+        y = abs(y2 - y1) * scrollPercentage
+
+        y = int(y1 + y)
+
+        self.screen.addstr(y, x, '==', self.c.color_pair(ERROR))
+
     def DebugMessage(self, string):
         self.screen.addstr(self.boxes["debug"]["ul"][1] + 1,
                            self.boxes["debug"]["ul"][0] + 1, string)
 
     def clearAreas(self):
-        self.drawBoundingBoxes(Title=True)
+        self.updateRectangles()
         for key in self.boxes.keys():
             uly, ulx = self.boxes[key]["ul"][1], self.boxes[key]["ul"][0]
             lry, lrx = self.boxes[key]["br"][1], self.boxes[key]["br"][0]
@@ -190,18 +285,51 @@ class Curses:
             for i in range(1, lineLen):
                 self.screen.addstr(uly + i, ulx + 1, " "*colLen)
 
-        # UI SHAPES
-    def rectangle(self, ul, br, Title=None):
+    def clearRectangle(self, ID):
+        self.updateRectangles()
+        uly, ulx = self.boxes[ID]["ul"][1], self.boxes[ID]["ul"][0]
+        lry, lrx = self.boxes[ID]["br"][1], self.boxes[ID]["br"][0]
+
+        lineLen = lry - uly
+        colLen = lrx - ulx - 1
+
+        for i in range(1, lineLen):
+            self.screen.addstr(uly + i, ulx + 1, " "*colLen)
+
+    def updateRectangles(self):
+        for key, value in self.boxes.items():
+            color = None
+            if self.boxes[key]["selected"] == True:
+                color = self.c.color_pair(SELECTION)
+
+            if self.printTitles == False:
+                self.rectangle(value["ul"], value["br"], color=color)
+            else:
+                self.rectangle(value["ul"], value["br"],
+                               Title=key.upper(), color=color)
+
+    # UI SHAPES
+    def rectangle(self, ul, br, Title=None, color=None):
         ulx, uly = ul[0], ul[1]
         lrx, lry = br[0], br[1]
-        self.screen.vline(uly, ulx, self.c.ACS_VLINE, lry - uly)
-        self.screen.hline(uly, ulx, self.c.ACS_HLINE, lrx - ulx)
-        self.screen.hline(lry, ulx, self.c.ACS_HLINE, lrx - ulx)
-        self.screen.vline(uly, lrx, self.c.ACS_VLINE, lry - uly)
-        self.screen.addch(uly, ulx, self.c.ACS_ULCORNER)
-        self.screen.addch(uly, lrx, self.c.ACS_URCORNER)
-        self.screen.addch(lry, lrx, self.c.ACS_LRCORNER)
-        self.screen.addch(lry, ulx, self.c.ACS_LLCORNER)
+        if color == None:
+            self.screen.vline(uly, ulx, self.c.ACS_VLINE, lry - uly)
+            self.screen.hline(uly, ulx, self.c.ACS_HLINE, lrx - ulx)
+            self.screen.hline(lry, ulx, self.c.ACS_HLINE, lrx - ulx)
+            self.screen.vline(uly, lrx, self.c.ACS_VLINE, lry - uly)
+            self.screen.addch(uly, ulx, self.c.ACS_ULCORNER)
+            self.screen.addch(uly, lrx, self.c.ACS_URCORNER)
+            self.screen.addch(lry, lrx, self.c.ACS_LRCORNER)
+            self.screen.addch(lry, ulx, self.c.ACS_LLCORNER)
+        else:
+            self.screen.vline(uly, ulx, self.c.ACS_VLINE, lry - uly, color)
+            self.screen.hline(uly, ulx, self.c.ACS_HLINE, lrx - ulx, color)
+            self.screen.hline(lry, ulx, self.c.ACS_HLINE, lrx - ulx, color)
+            self.screen.vline(uly, lrx, self.c.ACS_VLINE, lry - uly, color)
+            self.screen.addch(uly, ulx, self.c.ACS_ULCORNER, color)
+            self.screen.addch(uly, lrx, self.c.ACS_URCORNER, color)
+            self.screen.addch(lry, lrx, self.c.ACS_LRCORNER, color)
+            self.screen.addch(lry, ulx, self.c.ACS_LLCORNER, color)
 
         if not Title == None:
             Title = " " + Title + " "

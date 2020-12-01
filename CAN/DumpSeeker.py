@@ -63,6 +63,9 @@ def createDisplayerRectangles():
 
     displayer.addRectangleRelativeTo("cmd", "sensors", displayer.Reference.RIGHT,
                                      displayer.Alignment.TOP_BOTTOM, height=None, width=220)
+
+    displayer.addRectangleRelativeTo(
+        "cmd", "rawdata", displayer.Reference.BOTTOM, displayer.Alignment.LEFT_RIGHT, height=7)
     displayer.addRectangle(
         "debug", (0, displayer.lines - 4), (displayer.cols, displayer.lines))
 
@@ -80,12 +83,21 @@ if __name__ == "__main__":
 
     upIdx = ToReadMessages
     dwIdx = 0
+    key = None
+    prevKey = None
+    updateValues = False
     while True:
-        key = displayer.getChar()
+        prevKey = key
+        key = displayer.getChar(True)
 
-        displayer.clearAreas()
+        if key == displayer.c.KEY_MOUSE:
+            displayer.handleMouse()
+            continue
 
-        if(key == "KEY_RIGHT"):
+        # KEY_RIGHT
+        if(key == 261):
+            updateValues = True
+
             if(upIdx + ToReadMessages >= len(lines)):
                 upIdx = len(lines)
                 dwIdx = len(lines) - ToReadMessages
@@ -93,7 +105,10 @@ if __name__ == "__main__":
                 dwIdx += ToReadMessages
                 upIdx = dwIdx + ToReadMessages
 
-        if(key == "KEY_LEFT"):
+        # KEY_LEFT
+        if(key == 260):
+            updateValues = True
+
             if(dwIdx - ToReadMessages < 0):
                 upIdx = ToReadMessages
                 dwIdx = 0
@@ -101,24 +116,36 @@ if __name__ == "__main__":
                 dwIdx -= ToReadMessages
                 upIdx = dwIdx + ToReadMessages
 
-        if(key == "KEY_UP"):
+        # KEY_UP
+        if(key == 259):
             ToReadMessages += 250
             upIdx = dwIdx + ToReadMessages
-        if(key == "KEY_DOWN"):
+            if prevKey == key:
+                pass
+        # KEY_DOWN
+        if(key == 258):
             if(ToReadMessages > 250):
                 ToReadMessages -= 250
                 upIdx = dwIdx + ToReadMessages
+            if prevKey == key:
+                pass
 
         for line in lines[dwIdx: upIdx]:
             timestamp, id, payload = parseMessage(line)
             parser.parseMessage(timestamp, id, payload)
+
+        displayer.clearAreas()
+
+        #displayer.writeLines("rawdata", lines[dwIdx: upIdx])
+        displayer.setText("rawdata", lines[dwIdx: upIdx])
 
         sensorsLines = []
         for sensor in parser.sensors:
             if sensor.type == "Commands":
                 # Changing from absolute timestamp to relative timestamp
                 for i, cmds in enumerate(sensor.active_commands):
-                    sensor.active_commands[i] = (cmds[0], cmds[1] - startTime)
+                    sensor.active_commands[i] = (
+                        cmds[0], cmds[1] - startTime)
                 displayer.displayCommands(sensor)
                 sensor.clear()
             else:
@@ -133,5 +160,4 @@ if __name__ == "__main__":
 
         displayer.displayTable("sensors", sensorsLines, maxCols=5)
 
-        displayer.DebugMessage(
-            "Looking to lines between {} and {} ({}) ... total lines: {}, current time: {} total time: {}".format(dwIdx, upIdx, ToReadMessages, len(lines), round(timestamp - startTime, 3), round(duration, 3)))
+        #displayer.DebugMessage("Looking to lines between {} and {} ({}) ... total lines: {}, current time: {} total time: {}".format(dwIdx, upIdx, ToReadMessages, len(lines), round(timestamp - startTime, 3), round(duration, 3)))

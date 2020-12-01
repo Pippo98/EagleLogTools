@@ -31,6 +31,7 @@ newImage = threading.Event()
 mute = threading.Lock()
 runningThreads = []
 STOP_THREADS = threading.Event()
+PAUSE_THREADS = threading.Event()
 #################################################################################
 
 SIMULATE_STEERING = False
@@ -123,7 +124,7 @@ imageToDisplay = []
 lastImage = BACKGROUND
 
 
-framerate = 30
+framerate = 25
 
 if(ENABLE_MOVIE):
     framerate = movie.get(cv2.CAP_PROP_FPS)
@@ -139,14 +140,14 @@ to_clear = False
 prev_line_count = 0
 to_print_lines = []
 tot_msg = 0
-analysis_duration = 0.2
+analysis_duration = 0.5
 
 image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
 
 SHIFT_TIME = 0
 SHIFT_START_TIME = 0
 START_LINE = 1
-SPEED_UP = 2
+SPEED_UP = 1
 home = os.path.expanduser("~")
 filename = os.path.join(home, "Desktop/CANDUMP_DEFAULT_FOLDER")
 
@@ -240,6 +241,19 @@ def parse_message(msg):
     return timestamp, id, payload
 
 
+sTime = 0
+
+
+def start():
+    global sTime
+    sTime = time.time()
+
+
+def end():
+    global sTime
+    return (time.time() - sTime)*1000
+
+
 def displaySensors(name, background):
     # global image, BACKGROUND, sensors, imageToDisplay
     global imageToDisplay, newImage, STOP_THREADS, movie
@@ -248,13 +262,22 @@ def displaySensors(name, background):
     BACKGROUND = background
 
     while not STOP_THREADS.is_set():
+
+        mute.acquire()
+        T = time.time()
+        mute.release()
+
+        if PAUSE_THREADS.isSet():
+            time.sleep(0.002)
+            continue
+
         # Dispaying Image with all data every 0.3 sec
         if not movie == None:
             ret, frame = movie.read()
             BACKGROUND = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
         else:
-            if(time.time() - frameRateTime > 1/framerate):
-                frameRateTime = time.time()
+            if(T - frameRateTime > 1/framerate):
+                frameRateTime = T
                 BACKGROUND[:, :] = BACKGROUND_COLOR
             else:
                 continue
@@ -291,12 +314,15 @@ def displaySensors(name, background):
                 image = display_command(image, objs)
 
                 for i, obj in enumerate(objs):
-                    if(time.time() - obj[1] > 2):
+                    if(T - obj[1] > 2):
                         sensor.remove_command()
 
         if(LOG_FILE_MODE):
-            image = display_log_time(
-                image, log_start_time, log_end_time, timestamp-offset_time)
+            try:
+                image = display_log_time(
+                    image, log_start_time, log_end_time, timestamp-offset_time)
+            except:
+                pass
 
         mute.acquire()
         idxs = image[:, :, 3] > 0
@@ -366,31 +392,25 @@ if __name__ == "__main__":
     if(LOG_FILE_MODE):
         fil = open(filename, 'r')
         lines = fil.readlines()[START_LINE:]
-        line = lines.pop(0)
-        offset_time = parse_message(line)[0]
+        offset_time = parse_message(lines[START_LINE])[0]
 
         log_start_time = parse_message(lines[START_LINE])[0]
         log_end_time = parse_message(lines[-1])[0]
 
-    #print("Start analizing CAN messages")
+    # print("Start analizing CAN messages")
     start_time = time.time() - analysis_duration
     frameRateTime = time.time()
-    dt = time.time()
 
     timestamp = None
     id = None
     payload = None
-
-    #temp = open("/home/filippo/Desktop/f1.txt", "r")
-    #lines = temp.readlines()
-    #newDict = ast.literal_eval(lines.pop())
     newDict = None
     currentLineIdx = 0
 
     if ENABLE_PRINTING:
         displayer.initScreen()
         createDisplayerRectangles()
-        displayer.drawBoundingBoxes(Title=True)
+        displayer.drawBoundingBoxes()
 
     t = threading.Thread(target=displaySensors,
                          args=("None", BACKGROUND,))
@@ -400,7 +420,15 @@ if __name__ == "__main__":
     ###################################################################
     ############################## WHILE ##############################
     ###################################################################
+    dt = time.time()
     while True:
+        try:
+            k = displayer.getChar(False)
+            if k == displayer.c.KEY_MOUSE:
+                displayer.handleMouse()
+        except:
+            pass
+
         if Pause:
             key = cv2.waitKey(1)
             if key == 27:  # EXIT
@@ -408,6 +436,7 @@ if __name__ == "__main__":
                 quit("PRESSED ESC", "")
             if key == 32:  # SPACEBAR
                 Pause = not Pause
+                PAUSE_THREADS.clear()
             else:
                 continue
 
@@ -420,11 +449,22 @@ if __name__ == "__main__":
             timestamp, id, payload = parse_message(line)
             if(payload == None):
                 continue
-            while((timestamp - offset_time) / SPEED_UP > time.time() - dt):
+
+            while (timestamp - offset_time) / SPEED_UP > time.time() - dt:
                 continue
+            '''
+            while (timestamp - offset_time) / SPEED_UP < time.time() - dt:
+                try:
+                    line = lines[currentLineIdx]
+                    currentLineIdx += 1
+                except IndexError:
+                    quit("LOG FILE ENDED", "")
+                timestamp, id, payload = parse_message(line)
+                displayer.refresh()
+            '''
+
         if(not LOG_FILE_MODE):
             if(JSON_TYPE):
-                #line = lines.pop()
                 message = ser.readline().decode("utf-8")
                 try:
                     newDict = ast.literal_eval(str(message))
@@ -505,8 +545,10 @@ if __name__ == "__main__":
 
         if ENABLE_DISPLAYER:
             if (newImage.is_set()):
+                mute.acquire()
                 newImage.clear()
                 cv2.imshow(Window_Name, imageToDisplay)
+                mute.release()
 
                 key = cv2.waitKey(1)
                 if key == 27:  # EXIT
@@ -514,6 +556,4 @@ if __name__ == "__main__":
                 if key == 32:  # SPACEBAR
                     SHIFT_START_TIME = time.time()
                     Pause = not Pause
-
-
-ser.close()
+                    PAUSE_THREADS.set()
