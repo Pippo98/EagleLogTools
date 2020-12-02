@@ -160,4 +160,5 @@ if __name__ == "__main__":
 
         displayer.displayTable("sensors", sensorsLines, maxCols=5)
 
-        #displayer.DebugMessage("Looking to lines between {} and {} ({}) ... total lines: {}, current time: {} total time: {}".format(dwIdx, upIdx, ToReadMessages, len(lines), round(timestamp - startTime, 3), round(duration, 3)))
+        displayer.DebugMessage("Looking to lines between {} and {} ({}) ... total lines: {}, current time: {} total time: {}".format(
+            dwIdx, upIdx, ToReadMessages, len(lines), round(timestamp - startTime, 3), round(duration, 3)))
