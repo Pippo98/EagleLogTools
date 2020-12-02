@@ -190,7 +190,7 @@ def find_Stm():
     for port in info:
         if(port.product.find("STM32") != -1):
             return port.device, port.product
-    return 0, 0
+    return None, None
 
 
 def open_device(dev):
@@ -382,7 +382,7 @@ if __name__ == "__main__":
     offset_time = 0
 
     if(not LOG_FILE_MODE):
-        if find_Stm() != 0:
+        if find_Stm()[0] != None:
             dev, name = find_Stm()
             print("Opening {}".format(name))
             open_device(dev)

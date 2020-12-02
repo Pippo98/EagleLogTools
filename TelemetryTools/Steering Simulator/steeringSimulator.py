@@ -3,14 +3,12 @@
 import sys
 import can
 import time
-import queue
+import signal
 import threading
-import getch
-from threading import Event
 import click
 
 lock = threading.Lock()
-STOP_THREADS = False
+STOP_THREADS = threading.Event()
 
 bustype = 'socketcan_native'
 channel = 'vcan0'
@@ -53,8 +51,33 @@ using an array to print all car important messages
 8 -> ECU status
 9 -> Sent Messages
 10 -> exceptions
-
 '''
+
+help = [
+    "This program allow you to send CAN messages in virtual or non-virtual devices.",
+    "Some keys are associated with messages: ",
+    "'1' Send BMS-HV ON",
+    "'2' Send inverterL ON, after one second, Send inverterR ON",
+    "'3' Send RUN Request",
+    "'4' Send Setup Request",
+    "'5' Send Idle Request",
+    "",
+    "'m' To change MAP, each click increases the map sending the message, so PAY ATTENTION",
+    "    Sending ERRORS also sends the current map",
+    "",
+    "'s' to set steering wheel calibration MIN-MAX (first press sets MIN, second press sets MAX",
+    "'p' to set throttle calibration MIN-MAX (first press sets MIN, second press sets MAX",
+    "'c' to START-STOP cooling system",
+    "",
+    "'e' to request to ECU errors and warnings",
+    "'i' to request INVERTERS status",
+    "",
+    "'q' to QUIT",
+    ""
+]
+
+indentLevel = 4
+indentChar = '-'
 
 ecu_idx = 0
 bms_idx = 1
@@ -65,21 +88,28 @@ ecu_status_idx = 8
 sent_idx = 9
 exceptions_idx = 10
 
-print("\r\n"*(len(lines)))
-
 
 def updateDisplay():
 
     lock.acquire()
     print(("\033[F" + " "*150 + "\r") * (len(lines)+1))
     for line in lines:
-        print("\t" + line + "\r")
+        print(indentChar*indentLevel + line + "\r")
     lock.release()
+
+
+def displayHelp():
+    for line in help:
+        print(line + "\r")
+
+
+def clearScreen():
+    print(("\033[F" + " "*150 + "\r") * (len(lines) + len(help) + 1))
 
 
 def receive(none):
     global id, payload
-    while not STOP_THREADS:
+    while not STOP_THREADS.is_set():
 
         try:
             # newtoWaitMsg.wait()
@@ -168,11 +198,25 @@ def receive(none):
             updateDisplay()
 
 
+def quit(signal=None, frame=None):
+    clearScreen()
+    print("KILLING THREADS...")
+    STOP_THREADS.set()
+    t.join()
+    print("DONE")
+    print("NOW EXITING")
+    exit(0)
+
+
 msg = can.Message(arbitration_id=0x0,
                   data=[],
                   is_extended_id=False)
 
+# signal.signal(signal.SIGINT, quit)
 if __name__ == "__main__":
+
+    displayHelp()
+    print("\r\n"*(len(lines)))
 
     t = threading.Thread(target=receive, args=(None,))
     t.start()
@@ -195,10 +239,10 @@ if __name__ == "__main__":
 
     while True:
 
-        # key = stdscr.getch()
-        # key = cv2.waitKey(0)
-        #key = sys.stdin.read(1)
-        key = click.getchar(False)
+        try:
+            key = click.getchar(False)
+        except KeyboardInterrupt:
+            quit()
 
         # get a char to select which command to send
         if key == "1":
@@ -264,11 +308,11 @@ if __name__ == "__main__":
         if key == "e":
             lines[sent_idx] = "Sending Request Errors"
 
-            msg.dlc = 1
+            msg.dlc = 2
 
             # set the message and send it
             msg.arbitration_id = 0xA0
-            msg.data = [2]
+            msg.data = [2, map[map_idx]]
             bus.send(msg)
 
         if key == "p":
@@ -362,11 +406,6 @@ if __name__ == "__main__":
             bus.send(msg)
 
         if key == "q":
-            print("KILLING THREADS...")
-            STOP_THREADS = True
-            t.join()
-            print("DONE")
-            print("NOW EXITING")
-            exit(0)
+            quit()
 
-        updateDisplay()
+        # updateDisplay()
