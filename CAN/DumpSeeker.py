@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import signal
@@ -10,7 +11,7 @@ from browseTerminal import terminalBrowser
 
 parser = Parser.Parser()
 displayer = cursesDisplayer.Curses()
-homePath = os.path.endpathuser("~")
+homePath = os.path.expanduser("~")
 tb = terminalBrowser(startPath=os.path.join(homePath, "Desktop"))
 filename = tb.browse()
 '''
