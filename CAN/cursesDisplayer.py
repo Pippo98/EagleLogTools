@@ -36,8 +36,6 @@ class Curses:
         self.Reference = reference()
         self.Alignment = alignment()
 
-        self.Colors = Colors.Colors()
-
         self.c = curses
 
     def initScreen(self):
