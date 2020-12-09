@@ -2,7 +2,7 @@ import time
 import curses
 import threading
 
-import Colors
+
 import CoordinateManager
 from CoordinateManager import reference, alignment
 

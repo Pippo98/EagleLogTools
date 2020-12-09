@@ -10,7 +10,8 @@ from browseTerminal import terminalBrowser
 
 parser = Parser.Parser()
 displayer = cursesDisplayer.Curses()
-tb = terminalBrowser(startPath="/home/filippo/Desktop")
+homePath = os.path.endpathuser("~")
+tb = terminalBrowser(startPath=os.path.join(homePath, "Desktop"))
 filename = tb.browse()
 '''
 filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/09-nov-2020__16-41-18/0.log"
