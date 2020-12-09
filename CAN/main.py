@@ -5,6 +5,7 @@ import cv2
 import sys
 import ast
 import time
+import copy
 import queue
 import signal
 import getch
@@ -32,6 +33,7 @@ mute = threading.Lock()
 runningThreads = []
 STOP_THREADS = threading.Event()
 PAUSE_THREADS = threading.Event()
+modifiedSensor_thrd = queue.Queue()
 #################################################################################
 
 SIMULATE_STEERING = False
@@ -45,7 +47,7 @@ JSON_TYPE = True
 Pause = False
 ENABLE_MOVIE = False
 
-ENABLE_PRINTING = False
+ENABLE_PRINTING = True
 ENABLE_DISPLAYER = True
 
 #################################################################################
@@ -93,7 +95,7 @@ for arg in sys.argv[1:]:
         JSON_TYPE = False
     if(arg == "--def2"):
         ENABLE_DISPLAYER = True
-        ENABLE_PRINTING = True
+        ENABLE_PRINTING = False
         LOG_FILE_MODE = True
         TELEMETRY_LOG = False
         VOLANTE_DUMP = True
@@ -261,11 +263,11 @@ def displaySensors(name, background):
     frameRateTime = time.time()
     BACKGROUND = background
 
+    rects = createAllRectangles(WIDTH, HEIGHT)
+
     while not STOP_THREADS.is_set():
 
-        mute.acquire()
         T = time.time()
-        mute.release()
 
         if PAUSE_THREADS.isSet():
             time.sleep(0.002)
@@ -283,39 +285,41 @@ def displaySensors(name, background):
                 continue
 
         image = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
-        for i, sensor in enumerate(parser.sensors):
+        mute.acquire()
+        sensors = copy.deepcopy(parser.sensors)
+        mute.release()
+        for i, sensor in enumerate(sensors):
             if(sensor.type == "Accel"):
-                image = display_accel(image, 1, parser.a)
-            if(sensor.type == "Gyro"):
-                image = display_gyro(image, 1, parser.g)
-            if(sensor.type == "Accel IZZE"):
-                image = display_accel(image, 2, parser.a2)
-            if(sensor.type == "Gyro IZZE"):
-                image = display_gyro(image, 2, parser.g2)
-            if(sensor.type == "Pedals"):
-                image = display_apps(image, parser.pedals)
-                image = display_brake(image, parser.pedals)
-            if(sensor.type == "Steer"):
-                image = display_steer(image, parser.steer)
-            if(sensor.type == "Speed"):
-                image = display_enc(image, parser.speed)
-            if(sensor.type == "BMS LV"):
+                image = display_accel(image, 1, sensor)
+                pass
+            elif(sensor.type == "Gyro"):
+                image = display_gyro(image, 1, sensor)
+            elif(sensor.type == "Accel IZZE"):
+                image = display_accel(image, 2, sensor)
+                pass
+            elif(sensor.type == "Gyro IZZE"):
+                image = display_gyro(image, 2, sensor)
+            elif(sensor.type == "Pedals"):
+                start()
+                image = display_apps(image, sensor)
+                image = display_brake(image, sensor)
+                print(end())
+            elif(sensor.type == "Steer"):
+                image = display_steer(image, sensor)
+            elif(sensor.type == "Speed"):
+                image = display_enc(image, sensor)
+            elif(sensor.type == "BMS LV"):
                 image = display_BMS_LV(
-                    image, parser.bmsLV.voltage, parser.bmsLV.temperature)
-            if(sensor.type == "BMS HV"):
+                    image, sensor.voltage, sensor.temperature)
+            elif(sensor.type == "BMS HV"):
                 image = display_BMS_HV(
-                    image, parser.bmsHV.voltage, parser.bmsHV.current, parser.bmsHV.temperature)
-            if(sensor.type == "Inverter Right"):
+                    image, sensor.voltage, sensor.current, sensor.temperature)
+            elif(sensor.type == "Inverter Right"):
                 image = display_inverter(
-                    image, parser.invl.speed, parser.invr.speed, parser.invl.torque, parser.invr.torque)
-
-            if(sensor.type == "Commands"):
+                    image, sensor.speed, sensor.speed, sensor.torque, sensor.torque)
+            elif(sensor.type == "Commands"):
                 objs, _ = sensor.get_obj()
                 image = display_command(image, objs)
-
-                for i, obj in enumerate(objs):
-                    if(T - obj[1] > 2):
-                        sensor.remove_command()
 
         if(LOG_FILE_MODE):
             try:
@@ -324,12 +328,14 @@ def displaySensors(name, background):
             except:
                 pass
 
+        #image = drawAllRectangles(image)
+
         mute.acquire()
         idxs = image[:, :, 3] > 0
         BACKGROUND[idxs] = image[idxs]
 
         newImage.set()
-        imageToDisplay = BACKGROUND
+        imageToDisplay = copy.deepcopy(BACKGROUND)
         mute.release()
         time.sleep(0.001)
 
@@ -469,7 +475,7 @@ if __name__ == "__main__":
                 try:
                     newDict = ast.literal_eval(str(message))
                 except Exception as e:
-                    displayer.DebugMessage(message)
+                    # displayer.DebugMessage(message)
                     continue
             else:
                 try:
@@ -483,61 +489,63 @@ if __name__ == "__main__":
 
         tot_msg += 1
 
+        modifiedSensors = []
         if(not TELEMETRY_LOG):
             if(JSON_TYPE):
                 ks = newDict.keys()
                 for sensor in parser.sensors:
                     if(sensor.type in ks):
                         sensor.__dict__.update(newDict[sensor.type])
-                modifiedSensors = parser.sensors
+                        modifiedSensors.append(sensor.type)
             else:
                 modifiedSensors = parser.parseMessage(timestamp, id, payload)
 
         else:
             modifiedSensors = parser.parseCSV(timestamp, id, payload)
 
+        if not modifiedSensors == []:
+            modifiedSensor_thrd.put(modifiedSensors)
+
         ###################################################################
         ########################### ANALYSIS PRINT ########################
         ###################################################################
 
-        if(time.time() - start_time >= analysis_duration):
+        for sensor in parser.sensors:
+            if sensor.type in modifiedSensors and sensor.type == "Commands":
+                for i, command in enumerate(sensor.active_commands):
+                    if(timestamp - command[1] > 2):
+                        sensor.remove_command(i)
 
-            # PRINT GENERAL CAN DATA
-            to_print_lines.append("Messages: {}".format(tot_msg))
-            to_print_lines.append("Frequency: {}".format(
-                tot_msg / analysis_duration))
-            to_print_lines.append("Average Delta: {}".format(
-                analysis_duration / tot_msg))
-            to_print_lines.append(separator1 * separator_count)
+        if(time.time() - start_time >= analysis_duration):
 
             tot_msg = 0
             start_time = time.time()
 
-            sensorsLines = []
-            for sensor in parser.sensors:
-                if sensor.type == "Commands":
-                    # Changing from absolute timestamp to relative timestamp
-                    for i, cmds in enumerate(sensor.active_commands):
-                        sensor.active_commands[i] = (
-                            cmds[0], cmds[1] - offset_time)
-                    displayer.displayCommands(sensor)
-                    sensor.clear()
-                else:
-                    text = []
-                    text.append(sensor.type + ": ")
-                    objs, names = sensor.get_obj()
-                    for i, obj in enumerate(objs):
-                        if(type(obj) == float):
-                            obj = round(obj, 2)
-                        text.append(names[i] + ": " + str(obj))
-                    sensorsLines.append(text)
+            if ENABLE_PRINTING:
+                sensorsLines = []
+                for sensor in parser.sensors:
+                    if sensor.type == "Commands":
+                        # Changing from absolute timestamp to relative timestamp
+                        for i, cmds in enumerate(sensor.active_commands):
+                            sensor.active_commands[i] = (
+                                cmds[0], cmds[1] - offset_time)
+                        displayer.displayCommands(sensor)
+                    else:
+                        text = []
+                        text.append(sensor.type + ": ")
+                        objs, names = sensor.get_obj()
+                        for i, obj in enumerate(objs):
+                            if(type(obj) == float):
+                                obj = round(obj, 2)
+                            text.append(names[i] + ": " + str(obj))
+                        sensorsLines.append(text)
 
-            displayer.clearAreas()
-            displayer.displayTable("sensors", sensorsLines, maxCols=5)
-            if LOG_FILE_MODE:
-                displayer.DebugMessage("Looking to line {} ... total lines: {}, current time: {} total time: {}".format(
-                    currentLineIdx, len(lines), round(timestamp - offset_time, 3), round(log_end_time - log_start_time, 3)))
-            displayer.refresh()
+                displayer.clearAreas()
+                displayer.displayTable("sensors", sensorsLines, maxCols=5)
+                if LOG_FILE_MODE:
+                    displayer.DebugMessage("Looking to line {} ... total lines: {}, current time: {} total time: {}".format(
+                        currentLineIdx, len(lines), round(timestamp - offset_time, 3), round(log_end_time - log_start_time, 3)))
+                displayer.refresh()
 
         ###################################################################
         ############################# UI THREAD ###########################

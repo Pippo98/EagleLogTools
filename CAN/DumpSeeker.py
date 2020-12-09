@@ -10,7 +10,6 @@ from browseTerminal import terminalBrowser
 
 parser = Parser.Parser()
 displayer = cursesDisplayer.Curses()
-'''
 tb = terminalBrowser(startPath="/home/filippo/Desktop")
 filename = tb.browse()
 '''
@@ -18,6 +17,7 @@ filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/09-nov-2020__16-41-18/0
 filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/09-nov-2020__16-41-18/3.log"
 filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/09-nov-2020__16-41-18/4.log"
 filename = "/home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER/09-nov-2020__16-41-18/5.log"
+'''
 
 ToReadMessages = 500
 
@@ -65,7 +65,7 @@ def createDisplayerRectangles():
                                      displayer.Alignment.TOP_BOTTOM, height=None, width=220)
 
     displayer.addRectangleRelativeTo(
-        "cmd", "rawdata", displayer.Reference.BOTTOM, displayer.Alignment.LEFT_RIGHT, height=7)
+        "cmd", "rawdata", displayer.Reference.BOTTOM, displayer.Alignment.LEFT_RIGHT, height=17)
     displayer.addRectangle(
         "debug", (0, displayer.lines - 4), (displayer.cols, displayer.lines))
 

@@ -10,6 +10,17 @@ ser = serial.Serial()
 
 logPath = "/home/ubuntu/logs/"
 
+
+def set_proc_name(newname):
+    from ctypes import cdll, byref, create_string_buffer
+    libc = cdll.LoadLibrary('libc.so.6')
+    buff = create_string_buffer(len(newname)+1)
+    buff.value = newname
+    libc.prctl(15, byref(buff), 0, 0, 0)
+
+
+set_proc_name(b"gpsdump")
+
 i = 0
 while os.path.exists(logPath+"%s.log" % i):
     i += 1
@@ -35,11 +46,12 @@ def open_device(dev):
     ser.open()
     ser.readline()
 
+
 if __name__ == "__main__":
     if find_Stm() != 0:
         open_device(find_Stm())
     else:
-        print("no STM32 Detected, Exit_Program")
+        print("no Serial device connected, Exit_Program")
         exit(0)
 
     while True:
@@ -51,4 +63,3 @@ if __name__ == "__main__":
             time.sleep(0.001)
             log.close()
             exit(0)
-

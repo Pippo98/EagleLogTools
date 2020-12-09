@@ -1,4 +1,4 @@
 #!/bin/sh
 
-pkill -SIGKILL python3
+pkill -SIGKILL gpsdump
 pkill -SIGKILL candump

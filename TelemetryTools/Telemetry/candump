@@ -13,4 +13,4 @@ done
 
 candump -Ld can0 > "$path/$fname" &
 
-exit 0 
+exit 0

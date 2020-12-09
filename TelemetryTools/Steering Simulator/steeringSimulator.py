@@ -89,10 +89,17 @@ sent_idx = 9
 exceptions_idx = 10
 
 
-def updateDisplay():
+def set_proc_name(newname):
+    from ctypes import cdll, byref, create_string_buffer
+    libc = cdll.LoadLibrary('libc.so.6')
+    buff = create_string_buffer(len(newname)+1)
+    buff.value = newname
+    libc.prctl(15, byref(buff), 0, 0, 0)
 
+
+def updateDisplay():
     lock.acquire()
-    print(("\033[F" + " "*150 + "\r") * (len(lines)+1))
+    print(("\x1b[2K\x1b[2A" + " "*150 + "\n") * (len(lines) + 1))
     for line in lines:
         print(indentChar*indentLevel + line + "\r")
     lock.release()
@@ -213,6 +220,10 @@ msg = can.Message(arbitration_id=0x0,
                   is_extended_id=False)
 
 # signal.signal(signal.SIGINT, quit)
+
+
+set_proc_name(b"steering_sim")
+
 if __name__ == "__main__":
 
     displayHelp()
@@ -227,15 +238,16 @@ if __name__ == "__main__":
     msg.arbitration_id = 0xAF
     msg.data = [0, 0]
     cooling_task = bus.send_periodic(msg, 0.5)
-
+    '''
     # Autorepeat message to inverters to request status
     msg.dlc = 2
     msg.data = [0x3D, 0xD8]
     msg.arbitration_id = 0x201              # Left
     inverter_l_status_task = bus.send_periodic(msg, 0.5)
-    time.sleep(0.5)
+    time.sleep(0.2)
     msg.arbitration_id = 0x202              # Right
     inverter_r_status_task = bus.send_periodic(msg, 0.5)
+    '''
 
     while True:
 
@@ -265,6 +277,7 @@ if __name__ == "__main__":
             msg.data = [8]
             bus.send(msg)
 
+            updateDisplay()
             time.sleep(1)
 
             lines[sent_idx] += "Sending INVR ON"
@@ -398,6 +411,7 @@ if __name__ == "__main__":
             msg.arbitration_id = 0x201
             bus.send(msg)
 
+            updateDisplay()
             time.sleep(0.5)
 
             lines[sent_idx] += "Sending INVR STATUS REQUEST"
@@ -408,4 +422,4 @@ if __name__ == "__main__":
         if key == "q":
             quit()
 
-        # updateDisplay()
+        updateDisplay()

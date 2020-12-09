@@ -1,7 +1,14 @@
 import cv2
+import time
 import math
 import numpy as np
 import DeviceClasses as dev
+
+import CoordinateManager
+
+cm = CoordinateManager.CoordinateManager()
+alignment = CoordinateManager.alignment()
+reference = CoordinateManager.reference()
 
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 FONT_SIZE = 0.6
@@ -13,6 +20,119 @@ pedal_size = (40, 100)
 steer_wheel_size = (200, 100)
 
 commands = []
+
+rectanglesIDS = [
+    "topStrip",
+    "HV",
+    "LV",
+
+]
+
+rectangles = {}
+
+
+def getCenter(ul, br):
+    center = (
+        int((abs(br[0] - ul[0]) / 2) + ul[0]),
+        int((abs(br[1] - ul[1]) / 2) + ul[1])
+    )
+    return center
+
+
+def createAllRectangles(img_width, img_height):
+
+    global rectangles
+    # Setting max possible coordinates
+    # Here sizes are in px
+    padding = 10
+
+    cm.minX = padding
+    cm.minY = padding
+    cm.maxX = img_width - padding
+    cm.maxY = img_height - padding
+
+    cm.addRect("topStrip", (0, 0), (img_width, 70))
+
+    cm.addRelativeTo("topStrip", "inverterL", reference.BOTTOM,
+                     alignment.LEFT_RIGHT, height=50, width=150, padding=padding, offY=50)
+    cm.addRelativeTo("topStrip", "inverterR", reference.BOTTOM,
+                     alignment.RIGHT_LEFT, height=50, width=150, padding=padding, offY=50)
+    cm.addRelativeTo("topStrip", "encoder", reference.BOTTOM,
+                     alignment.CENTER, height=50, width=150, padding=padding, offY=50)
+
+    cm.addRelativeTo("inverterL", "HV", reference.BOTTOM,
+                     alignment.LEFT_RIGHT, height=100, width=20, padding=padding, offY=50)
+    cm.addRelativeTo("inverterR", "LV", reference.BOTTOM,
+                     alignment.RIGHT_LEFT, height=100, width=20, padding=padding, offY=50)
+
+    cm.addRelativeTo("encoder", "steering", reference.BOTTOM,
+                     alignment.CENTER, height=150, width=250, padding=padding)
+
+    cm.addRelativeTo("steering", "brake", reference.LEFT,
+                     alignment.BOTTOM_TOP, height=100, width=40, padding=padding)
+    cm.addRelativeTo("steering", "throttle", reference.RIGHT,
+                     alignment.BOTTOM_TOP, height=100, width=40, padding=padding)
+
+    cm.addRect("accel1", (0, img_height*4/5), (200, img_height))
+    cm.addRelativeTo("accel1", "gyro1", reference.RIGHT,
+                     alignment.TOP_BOTTOM, padding=padding)
+    cm.addRelativeTo("gyro1", "accel2", reference.RIGHT,
+                     alignment.TOP_BOTTOM, padding=padding)
+    cm.addRelativeTo("accel2", "gyro2", reference.RIGHT,
+                     alignment.TOP_BOTTOM, padding=padding)
+    # cm.addRect("wheel", (img_width-200, img_height*4/5),
+    #            (img_width, img_height))
+
+    rectangles = cm.getRectangles()
+
+    return rectangles
+
+
+def drawAllRectangles(image):
+
+    for key, val in cm.getRectangles().items():
+        image = draw_rectangle_(image, ul=val["ul"], br=val["br"],
+                                theta=0, color=(255, 255, 255, 255))
+
+    return image
+
+
+def draw_rectangle_(image, ul, br, theta, color, line_weight=1, diagonals=False, line_type=cv2.LINE_AA):
+    theta = np.radians(theta)
+    c, s = np.cos(theta), np.sin(theta)
+    R = np.matrix('{} {}; {} {}'.format(c, -s, s, c))
+
+    center = (
+        int((abs(br[0] - ul[0]) / 2) + ul[0]),
+        int((abs(br[1] - ul[1]) / 2) + ul[1])
+    )
+
+    p1 = (ul[0] - center[0], ul[1] - center[1])
+    p2 = (br[0] - center[0], ul[1] - center[1])
+    p3 = (br[0] - center[0], br[1] - center[1])
+    p4 = (ul[0] - center[0], br[1] - center[1])
+
+    p1_new = np.dot(p1, R) + center
+    p2_new = np.dot(p2, R) + center
+    p3_new = np.dot(p3, R) + center
+    p4_new = np.dot(p4, R) + center
+
+    img = cv2.line(image, (int(p1_new[0, 0]), int(p1_new[0, 1])), (int(
+        p2_new[0, 0]), int(p2_new[0, 1])), color, line_weight, line_type)
+    img = cv2.line(img, (int(p2_new[0, 0]), int(p2_new[0, 1])), (int(
+        p3_new[0, 0]), int(p3_new[0, 1])), color, line_weight, line_type)
+    img = cv2.line(img, (int(p3_new[0, 0]), int(p3_new[0, 1])), (int(
+        p4_new[0, 0]), int(p4_new[0, 1])), color, line_weight, line_type)
+    img = cv2.line(img, (int(p4_new[0, 0]), int(p4_new[0, 1])), (int(
+        p1_new[0, 0]), int(p1_new[0, 1])), color, line_weight, line_type)
+
+    if(diagonals):
+        img = cv2.line(img, (int(p2_new[0, 0]), int(p2_new[0, 1])), (int(
+            p4_new[0, 0]), int(p4_new[0, 1])), color, line_weight, line_type)
+        img = cv2.line(img, (int(p1_new[0, 0]), int(p1_new[0, 1])), (int(
+            p3_new[0, 0]), int(p3_new[0, 1])), color, line_weight, line_type)
+
+    return img
 
 
 def draw_rectangle(image, centre, theta, width, height, color, line_weight=1, diagonals=True, line_type=cv2.LINE_AA):
@@ -117,18 +237,13 @@ def display_accel(image, type, accel):
 
     max_accel = int(accel.scale)
     if type == 1:
-        center = (
-            int(len(image[0])*3/20),
-            int(len(image[1])/2)
-        )
+        rect = rectangles["accel1"]
         scl = 35
     else:
-        center = (
-            int(len(image[0])*8/20),
-            int(len(image[1])/2)
-        )
+        rect = rectangles["accel2"]
         scl = 15
 
+    center = getCenter(rect["ul"], rect["br"])
     x = -accel.x
 
     point = (
@@ -156,15 +271,11 @@ def display_gyro(image, type, gyro):
     zcolor = (255, 0, 225, 255)
 
     if type == 1:
-        center = (
-            int(len(image[0])*3/20),
-            int(len(image[1])/2)
-        )
+        rect = rectangles["gyro1"]
     else:
-        center = (
-            int(len(image[0])*8/20),
-            int(len(image[1])/2)
-        )
+        rect = rectangles["gyro2"]
+
+    center = getCenter(rect["ul"], rect["br"])
 
     radius = 130
 
@@ -182,10 +293,8 @@ def display_enc(image, enc):
 
     textsize = cv2.getTextSize(text, FONT, 1, 2)[0][0]
 
-    center = (
-        int(len(image[0])/2 - textsize/2),
-        int(len(image[1])/20)
-    )
+    rect = rectangles["encoder"]
+    center = getCenter(rect["ul"], rect["br"])
 
     tcolor = (255, 255, 255, 255)
 
@@ -193,34 +302,6 @@ def display_enc(image, enc):
                 FONT, FONT_SIZE*1.4, tcolor, 1, cv2.LINE_AA)
 
     zcolor = (0, 0, 225, 255)
-
-    ###################################################################
-
-    a0 = math.degrees(enc.angle0)
-    a1 = math.degrees(enc.angle1)
-    da = math.degrees(enc.delta)
-
-    circleCenter = (
-        int(len(image[0])*7/10),
-        int(len(image[1])/2)
-    )
-    xcolor = (255, 255, 225, 255)
-
-    radius = 120
-    cv2.ellipse(image, circleCenter, (radius, radius), -90,
-                0, 360, zcolor, 2)
-
-    pointCenter = (
-        int(circleCenter[0] + radius * math.cos(enc.angle1)),
-        int(circleCenter[1] + radius * math.sin(enc.angle1)),
-    )
-    cv2.circle(image, pointCenter, 5, xcolor, -1)
-
-    xcolor = (255, 0, 225, 255)
-    radius = 130
-
-    cv2.ellipse(image, circleCenter, (radius, radius), 0,
-                0, -da, xcolor, 2)
 
     return image
 
@@ -232,10 +313,8 @@ def display_steer(image, steer):
 
     textsize = cv2.getTextSize(text, FONT, 1, 2)[0]
 
-    center = (
-        int(len(image[0])/2),
-        int(len(image[1])/5)
-    )
+    rect = rectangles["steering"]
+    center = getCenter(rect["ul"], rect["br"])
 
     tcolor = (255, 255, 255, 255)
 
@@ -249,92 +328,79 @@ def display_steer(image, steer):
 
 
 def display_apps(image, pedals):
-    center = (
-        int(len(image[0])/2 + steer_wheel_size[0] - pedal_size[0]/2),
-        int(len(image[1])/5 + pedal_size[1] / 2)
-    )
+
+    rect = rectangles["throttle"]
+    p1 = rect["ul"]
+    p2 = rect["br"]
 
     tcolor = (255, 255, 255, 255)
     rectColor = (0, 255, 0, 255)
 
-    p1 = (center[0]-pedal_size[0], int(center[1]))
-    p2 = (center[0], int(center[1]-pedal_size[1]))
     cv2.rectangle(image, p1, p2, rectColor, 1, cv2.LINE_AA)
 
-    p1 = (center[0]-pedal_size[0],
-          int((center[1])))
-    p2 = (center[0],
-          int((center[1]-(pedal_size[1]*pedals.throttle1/100))))
+    # p1 = (p1[0],
+    #       int(p2[1] - abs(p1[1] - p2[1]) * (pedals.throttle1/100))
+    #       )
 
-    cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
+    # cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
 
-    txt = str(pedals.throttle1)
+    # txt = str(pedals.throttle1)
 
-    textsize = cv2.getTextSize(txt, FONT, 1, 2)[0]
+    # textsize = cv2.getTextSize(txt, FONT, 1, 2)[0]
 
-    center = (
-        int(center[0]),
-        center[1],
-    )
-
-    cv2.putText(image, txt, center,
-                FONT, FONT_SIZE*1, rectColor, 1, cv2.LINE_AA)
+    # cv2.putText(image, txt, p1,
+    #             FONT, FONT_SIZE*1, rectColor, 1, cv2.LINE_AA)
 
     return image
 
 
 def display_brake(image, brake):
 
-    center = (
-        int(len(image[0])/2 - steer_wheel_size[0] + pedal_size[0] / 2),
-        int(len(image[1])/5 + pedal_size[1]/2)
-    )
+    # tcolor = (255, 255, 255, 255)
+    # rectColor = (0, 0, 255, 255)
 
-    tcolor = (255, 255, 255, 255)
-    rectColor = (0, 0, 255, 255)
+    # rect = rectangles["brake"]
+    # p1 = rect["ul"]
+    # p2 = rect["br"]
 
-    p1 = (center[0]+pedal_size[0], int(center[1]))
-    p2 = (center[0], int(center[1]-pedal_size[1]))
-    cv2.rectangle(image, p1, p2, rectColor, 1, cv2.LINE_AA)
+    # cv2.rectangle(image, p1, p2, rectColor, 1, cv2.LINE_AA)
 
-    if (brake.brake > 0):
-        cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
-
-    # cv2.putText(image, "brake: "+str(int(line[1])), center,
-    #             FONT, FONT_SIZE, tcolor, 1, cv2.LINE_AA)
+    # if (brake.brake > 0):
+    #     cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
 
     return image
 
 
 def display_command(image, commands):
 
-    centre = (
-        int(len(image[0])*10/12),
-        int(len(image[1])/20)
-    )
+    rectColor = (250, 127, 255, 255)
+
+    rect = rectangles["topStrip"]
+
+    p1 = rect["ul"]
+    p2 = rect["br"]
+
     w = 220
     h = 60
     span = 8
 
+    p1 = (
+        p1[0],
+        p1[1] + span
+    )
+
     for command in commands:
-        textsize = cv2.getTextSize(command[0], FONT, 1, 2)[0][0]
+        # if time.time() - command[1] > 2:
+        #     continue
 
-        rectColor = (220, 220, 220, 255)
+        textsize, baseline = cv2.getTextSize(command[0], FONT, 1, 2)
 
-        image = draw_rectangle(image, centre, 0, w, h,
-                               rectColor, diagonals=False)
-
-        tcentre = (
-            int(centre[0] - w/2),
-            centre[1]
-        )
-
-        cv2.putText(image, command[0], tcentre,
+        cv2.putText(image, command[0], p1,
                     FONT, FONT_SIZE*1, rectColor, 1, cv2.LINE_AA)
 
-        centre = (
-            centre[0],
-            centre[1] + h + span
+        p1 = (
+            p1[0] + textsize[0] + span,
+            p1[1]
         )
 
     return image
@@ -370,44 +436,41 @@ def display_log_time(image, start, end, currentT):
 
 
 def display_BMS_LV(image, voltage, temperature):
-    batteryDimension = (20, 80)
 
     percent = voltage / 16.8
-
-    center = (
-        int(len(image[0]) - batteryDimension[0]/2),
-        int(len(image[1])/5 + batteryDimension[1] / 2)
-    )
 
     tcolor = (255, 255, 255, 255)
     rectColor = (255, 0, 0, 255)
 
-    p1 = (center[0]-batteryDimension[0], int(center[1]))
-    p2 = (center[0], int(center[1]-batteryDimension[1]))
+    rect = rectangles["LV"]
+
+    p1 = rect["ul"]
+    p2 = rect["br"]
 
     cv2.rectangle(image, p1, p2, rectColor, 1, cv2.LINE_AA)
 
-    p2 = (p2[0],
-          int((center[1]-(batteryDimension[1]*percent))))
+    p1 = (p1[0],
+          int(p2[1] - (abs(p2[1] - p1[1]) * percent))
+          )
 
     cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
 
     # LOW VOLTAGE VOLTAGE
     text = "LV VOLT: " + str(round(voltage, 2))
-    textsize = cv2.getTextSize(text, FONT, FONT_SIZE*0.8, 2)[0]
+    textsize, baseline = cv2.getTextSize(text, FONT, FONT_SIZE*0.8, 2)
 
-    x = (int(center[0] - textsize[0]),
-         int(center[1] - batteryDimension[1] - textsize[1]/2))
+    x = (int(p2[0] - textsize[0]),
+         int(p1[1] - textsize[1] - baseline))
 
     cv2.putText(image, text, x,
                 FONT, FONT_SIZE*0.8, tcolor, 1, cv2.LINE_AA)
 
     # LOW VOLTAGE TEMPERATURE
     text = "LV TEMP: " + str(round(temperature, 2))
-    textsize = cv2.getTextSize(text, FONT, FONT_SIZE*0.8, 1)[0]
+    textsize, baseline = cv2.getTextSize(text, FONT, FONT_SIZE*0.8, 1)
 
-    x = (int(center[0] - textsize[0]),
-         int(center[1] + textsize[1] + lineSpacing))
+    x = (int(p2[0] - textsize[0]),
+         int(p2[1] + textsize[1] + baseline))
 
     cv2.putText(image, text, x,
                 FONT, FONT_SIZE*0.8, tcolor, 1, cv2.LINE_AA)
@@ -416,34 +479,31 @@ def display_BMS_LV(image, voltage, temperature):
 
 
 def display_BMS_HV(image, voltage, current, temp):
-    batteryDimension = (20, 80)
 
     percent = voltage / 454
-
-    center = (
-        int(0 + batteryDimension[0]/2),
-        int(len(image[1])/5 + batteryDimension[1] / 2)
-    )
 
     tcolor = (255, 255, 255, 255)
     rectColor = (255, 0, 0, 255)
 
-    p1 = (center[0]+batteryDimension[0], int(center[1]))
-    p2 = (center[0], int(center[1]-batteryDimension[1]))
+    rect = rectangles["HV"]
+
+    p1 = rect["ul"]
+    p2 = rect["br"]
 
     cv2.rectangle(image, p1, p2, rectColor, 1, cv2.LINE_AA)
 
-    p2 = (p2[0],
-          int((center[1]-(batteryDimension[1]*percent))))
+    p1 = (p1[0],
+          int(p2[1] - (abs(p2[1] - p1[1]) * percent))
+          )
 
     cv2.rectangle(image, p1, p2, rectColor, -1, cv2.LINE_AA)
 
     # HIGH VOLTAGE VOLT
     text = "HV VOLT: " + str(round(voltage, 2))
-    textsize = cv2.getTextSize(text, FONT, FONT_SIZE*0.8, 1)[0]
+    textsize, baseline = cv2.getTextSize(text, FONT, FONT_SIZE*0.8, 1)
 
-    x = (int(center[0]),
-         int(center[1] - batteryDimension[1] - textsize[1]/2))
+    x = (int(p1[0]),
+         int(p1[1] - textsize[1] - baseline))
 
     cv2.putText(image, text, x,
                 FONT, FONT_SIZE*0.8, tcolor, 1, cv2.LINE_AA)
@@ -452,8 +512,8 @@ def display_BMS_HV(image, voltage, current, temp):
     text = "HV CURRENT: " + str(round(current, 2))
     textsize = cv2.getTextSize(text, FONT, FONT_SIZE*0.8, 1)[0]
 
-    x = (int(center[0]),
-         int(center[1] + textsize[1] + lineSpacing))
+    x = (int(p1[0]),
+         int(p2[1] + textsize[1] + baseline))
 
     cv2.putText(image, text, x,
                 FONT, FONT_SIZE*0.8, tcolor, 1, cv2.LINE_AA)
@@ -462,66 +522,57 @@ def display_BMS_HV(image, voltage, current, temp):
 
 
 def display_inverter(image, speedl, speedr, torquel, torquer):
-
-    line_span = 20
+    tcolor = (255, 255, 255, 255)
 
     # INVERTER LEFT
     text = str(round(speedl, 2))+" Km/h"
 
-    textsize = cv2.getTextSize(text, FONT, 1, 2)[0][0]
+    rect = rectangles["inverterL"]
 
-    center = (
-        int(0),
-        int(len(image[1])/20)
-    )
+    p1 = rect["ul"]
+    p2 = rect["br"]
 
-    tcolor = (255, 255, 255, 255)
-
-    cv2.putText(image, text, center,
+    cv2.putText(image, text, p1,
                 FONT, FONT_SIZE*1.4, tcolor, 1, cv2.LINE_AA)
 
     text = str(round(torquel, 2))+" Nm"
 
-    textsize = cv2.getTextSize(text, FONT, 1, 2)[0]
+    textsize, baseline = cv2.getTextSize(text, FONT, FONT_SIZE*1.4, 2)
 
-    center = (
-        int(0),
-        int(len(image[1])/20 + lineSpacing + textsize[1])
+    p1 = (
+        p1[0],
+        p1[1] + textsize[1] + baseline
     )
 
     tcolor = (255, 255, 255, 255)
 
-    cv2.putText(image, text, center,
+    cv2.putText(image, text, p1,
                 FONT, FONT_SIZE*1.4, tcolor, 1, cv2.LINE_AA)
 
     # INVERTER RIGHT
 
     text = str(round(speedr, 2))+" Km/h"
 
-    textsize = cv2.getTextSize(text, FONT, 1, 2)[0][0]
+    rect = rectangles["inverterR"]
 
-    center = (
-        int(len(image[0]) - textsize),
-        int(len(image[1])/20)
-    )
+    p1 = rect["ul"]
+    p2 = rect["br"]
 
     tcolor = (255, 255, 255, 255)
 
-    cv2.putText(image, text, center,
+    cv2.putText(image, text, p1,
                 FONT, FONT_SIZE*1.4, tcolor, 1, cv2.LINE_AA)
 
     text = str(round(torquer, 2))+" Nm"
 
-    textsize = cv2.getTextSize(text, FONT, 1, 2)[0]
+    textsize, baseline = cv2.getTextSize(text, FONT, FONT_SIZE*1.4, 2)
 
-    center = (
-        int(len(image[0]) - textsize[0]),
-        int(len(image[1])/20 + lineSpacing + textsize[1])
+    p1 = (
+        p1[0],
+        p1[1] + textsize[1] + baseline
     )
 
-    tcolor = (255, 255, 255, 255)
-
-    cv2.putText(image, text, center,
+    cv2.putText(image, text, p1,
                 FONT, FONT_SIZE*1.4, tcolor, 1, cv2.LINE_AA)
 
     return image
