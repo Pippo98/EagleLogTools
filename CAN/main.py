@@ -291,19 +291,15 @@ def displaySensors(name, background):
         for i, sensor in enumerate(sensors):
             if(sensor.type == "Accel"):
                 image = display_accel(image, 1, sensor)
-                pass
             elif(sensor.type == "Gyro"):
                 image = display_gyro(image, 1, sensor)
             elif(sensor.type == "Accel IZZE"):
                 image = display_accel(image, 2, sensor)
-                pass
             elif(sensor.type == "Gyro IZZE"):
                 image = display_gyro(image, 2, sensor)
             elif(sensor.type == "Pedals"):
-                start()
                 image = display_apps(image, sensor)
                 image = display_brake(image, sensor)
-                print(end())
             elif(sensor.type == "Steer"):
                 image = display_steer(image, sensor)
             elif(sensor.type == "Speed"):
