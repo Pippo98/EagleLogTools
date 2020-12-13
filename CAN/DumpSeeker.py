@@ -35,7 +35,7 @@ def parseMessage(msg):
         timestamp = (float(msg[0].replace("(", "").replace(")", "")))
         id = (int(msg[2].split("#")[0], 16))
         for i in range(0, len(msg[2].split("#")[1]), 2):
-            payload.append((int(msg[2].split("#")[1][i: i+2], 16)))
+            payload.append((int(msg[2].split("#")[1][i:i + 2], 16)))
     except Exception as e:
         return timestamp, id, None
     return timestamp, id, payload
@@ -63,18 +63,28 @@ def createDisplayerRectangles():
 
     displayer.addRectangle("cmd", (0, 0), (50, 20))
 
-    displayer.addRectangleRelativeTo("cmd", "sensors", displayer.Reference.RIGHT,
-                                     displayer.Alignment.TOP_BOTTOM, height=None, width=220)
+    displayer.addRectangleRelativeTo("cmd",
+                                     "sensors",
+                                     displayer.Reference.RIGHT,
+                                     displayer.Alignment.TOP_BOTTOM,
+                                     height=None,
+                                     width=220)
 
-    displayer.addRectangleRelativeTo(
-        "cmd", "rawdata", displayer.Reference.BOTTOM, displayer.Alignment.LEFT_RIGHT, height=17)
-    displayer.addRectangle(
-        "debug", (0, displayer.lines - 4), (displayer.cols, displayer.lines))
+    displayer.addRectangleRelativeTo("cmd",
+                                     "rawdata",
+                                     displayer.Reference.BOTTOM,
+                                     displayer.Alignment.LEFT_RIGHT,
+                                     height=17)
+    displayer.addRectangle("debug", (0, displayer.lines - 4),
+                           (displayer.cols, displayer.lines))
 
 
 if __name__ == "__main__":
     fil = open(filename, 'r')
     lines = fil.readlines()
+
+    while parseMessage(lines[0])[0] == None:
+        lines.pop(0)
 
     startTime, endTime, duration = get_log_duration(lines)
 
@@ -97,10 +107,10 @@ if __name__ == "__main__":
             continue
 
         # KEY_RIGHT
-        if(key == 261):
+        if (key == 261):
             updateValues = True
 
-            if(upIdx + ToReadMessages >= len(lines)):
+            if (upIdx + ToReadMessages >= len(lines)):
                 upIdx = len(lines)
                 dwIdx = len(lines) - ToReadMessages
             else:
@@ -108,10 +118,10 @@ if __name__ == "__main__":
                 upIdx = dwIdx + ToReadMessages
 
         # KEY_LEFT
-        if(key == 260):
+        if (key == 260):
             updateValues = True
 
-            if(dwIdx - ToReadMessages < 0):
+            if (dwIdx - ToReadMessages < 0):
                 upIdx = ToReadMessages
                 dwIdx = 0
             else:
@@ -119,35 +129,34 @@ if __name__ == "__main__":
                 upIdx = dwIdx + ToReadMessages
 
         # KEY_UP
-        if(key == 259):
+        if (key == 259):
             ToReadMessages += 250
             upIdx = dwIdx + ToReadMessages
             if prevKey == key:
                 pass
         # KEY_DOWN
-        if(key == 258):
-            if(ToReadMessages > 250):
+        if (key == 258):
+            if (ToReadMessages > 250):
                 ToReadMessages -= 250
                 upIdx = dwIdx + ToReadMessages
             if prevKey == key:
                 pass
 
-        for line in lines[dwIdx: upIdx]:
+        for line in lines[dwIdx:upIdx]:
             timestamp, id, payload = parseMessage(line)
             parser.parseMessage(timestamp, id, payload)
 
         displayer.clearAreas()
 
         #displayer.writeLines("rawdata", lines[dwIdx: upIdx])
-        displayer.setText("rawdata", lines[dwIdx: upIdx])
+        displayer.setText("rawdata", lines[dwIdx:upIdx])
 
         sensorsLines = []
         for sensor in parser.sensors:
             if sensor.type == "Commands":
                 # Changing from absolute timestamp to relative timestamp
                 for i, cmds in enumerate(sensor.active_commands):
-                    sensor.active_commands[i] = (
-                        cmds[0], cmds[1] - startTime)
+                    sensor.active_commands[i] = (cmds[0], cmds[1] - startTime)
                 displayer.displayCommands(sensor)
                 sensor.clear()
             else:
@@ -155,12 +164,14 @@ if __name__ == "__main__":
                 text.append(sensor.type + ": ")
                 objs, names = sensor.get_obj()
                 for i, obj in enumerate(objs):
-                    if(type(obj) == float):
+                    if (type(obj) == float):
                         obj = round(obj, 2)
                     text.append(names[i] + ": " + str(obj))
                 sensorsLines.append(text)
 
         displayer.displayTable("sensors", sensorsLines, maxCols=5)
 
-        displayer.DebugMessage("Looking to lines between {} and {} ({}) ... total lines: {}, current time: {} total time: {}".format(
-            dwIdx, upIdx, ToReadMessages, len(lines), round(timestamp - startTime, 3), round(duration, 3)))
+        displayer.DebugMessage(
+            "Looking to lines between {} and {} ({}) ... total lines: {}, current time: {} total time: {}"
+            .format(dwIdx, upIdx, ToReadMessages, len(lines),
+                    round(timestamp - startTime, 3), round(duration, 3)))

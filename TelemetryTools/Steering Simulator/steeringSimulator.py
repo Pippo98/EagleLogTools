@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import can
 import time
@@ -13,7 +14,6 @@ STOP_THREADS = threading.Event()
 bustype = 'socketcan_native'
 channel = 'vcan0'
 bus = can.interface.Bus(channel=channel, bustype=bustype)
-
 '''
 bus.recv()
 bus.send()
@@ -37,7 +37,6 @@ steeringMin = True
 map = [0xEC, 20, 40, 60, 80, 100]
 map_idx = 1
 
-
 lines = [""] * 12
 '''
 using an array to print all car important messages
@@ -55,25 +54,17 @@ using an array to print all car important messages
 
 help = [
     "This program allow you to send CAN messages in virtual or non-virtual devices.",
-    "Some keys are associated with messages: ",
-    "'1' Send BMS-HV ON",
+    "Some keys are associated with messages: ", "'1' Send BMS-HV ON",
     "'2' Send inverterL ON, after one second, Send inverterR ON",
-    "'3' Send RUN Request",
-    "'4' Send Setup Request",
-    "'5' Send Idle Request",
+    "'3' Send RUN Request", "'4' Send Setup Request", "'5' Send Idle Request",
     "",
     "'m' To change MAP, each click increases the map sending the message, so PAY ATTENTION",
-    "    Sending ERRORS also sends the current map",
-    "",
+    "    Sending ERRORS also sends the current map", "",
     "'s' to set steering wheel calibration MIN-MAX (first press sets MIN, second press sets MAX",
     "'p' to set throttle calibration MIN-MAX (first press sets MIN, second press sets MAX",
-    "'c' to START-STOP cooling system",
-    "",
+    "'c' to START-STOP cooling system", "",
     "'e' to request to ECU errors and warnings",
-    "'i' to request INVERTERS status",
-    "",
-    "'q' to QUIT",
-    ""
+    "'i' to request INVERTERS status", "", "'q' to QUIT", ""
 ]
 
 indentLevel = 4
@@ -92,16 +83,19 @@ exceptions_idx = 10
 def set_proc_name(newname):
     from ctypes import cdll, byref, create_string_buffer
     libc = cdll.LoadLibrary('libc.so.6')
-    buff = create_string_buffer(len(newname)+1)
+    buff = create_string_buffer(len(newname) + 1)
     buff.value = newname
     libc.prctl(15, byref(buff), 0, 0, 0)
 
 
 def updateDisplay():
     lock.acquire()
-    print(("\x1b[2K\x1b[2A" + " "*150 + "\n") * (len(lines) + 1))
+    os.system("clear")
+    #print(("\x1b[2K\x1b[2A" + " " * 150 + "\n") * (len(lines) + 1))
+
+    displayHelp()
     for line in lines:
-        print(indentChar*indentLevel + line + "\r")
+        print(indentChar * indentLevel + line + "\r")
     lock.release()
 
 
@@ -111,7 +105,8 @@ def displayHelp():
 
 
 def clearScreen():
-    print(("\033[F" + " "*150 + "\r") * (len(lines) + len(help) + 1))
+    os.system("clear")
+    #print(("\033[F" + " " * 150 + "\r") * (len(lines) + len(help) + 1))
 
 
 def receive(none):
@@ -174,19 +169,19 @@ def receive(none):
                     state = payload[4]
 
                     lines[error_idx] = "Errors:"
-                    if(errors & 0b00000001):
+                    if (errors & 0b00000001):
                         lines[error_idx] += " BMS HV NP"
-                    if(errors & 0b00000010):
+                    if (errors & 0b00000010):
                         lines[error_idx] += " BMS LV NP"
-                    if(errors & 0b00001000):
+                    if (errors & 0b00001000):
                         lines[error_idx] += " PEDALS NP"
-                    if(errors & 0b00010000):
+                    if (errors & 0b00010000):
                         lines[error_idx] += " CENTRAL NP"
-                    if(errors & 0b00100000):
+                    if (errors & 0b00100000):
                         lines[error_idx] += " FRONTAL NP"
-                    if(errors & 0b01000000):
+                    if (errors & 0b01000000):
                         lines[error_idx] += " INVERTER LEFT NP"
-                    if(errors & 0b10000000):
+                    if (errors & 0b10000000):
                         lines[error_idx] += " INVERTER RIGHT NP"
 
                     if state == 0:
@@ -215,21 +210,20 @@ def quit(signal=None, frame=None):
     exit(0)
 
 
-msg = can.Message(arbitration_id=0x0,
-                  data=[],
-                  is_extended_id=False)
+msg = can.Message(arbitration_id=0x0, data=[], is_extended_id=False)
 
 # signal.signal(signal.SIGINT, quit)
-
 
 set_proc_name(b"steering_sim")
 
 if __name__ == "__main__":
 
-    displayHelp()
-    print("\r\n"*(len(lines)))
+    clearScreen()
 
-    t = threading.Thread(target=receive, args=(None,))
+    #print("\r\n" * (len(lines)))
+    updateDisplay()
+
+    t = threading.Thread(target=receive, args=(None, ))
     t.start()
 
     # Autorepeat message to cooling system
@@ -238,16 +232,15 @@ if __name__ == "__main__":
     msg.arbitration_id = 0xAF
     msg.data = [0, 0]
     cooling_task = bus.send_periodic(msg, 0.5)
-    '''
+
     # Autorepeat message to inverters to request status
     msg.dlc = 2
     msg.data = [0x3D, 0xD8]
-    msg.arbitration_id = 0x201              # Left
+    msg.arbitration_id = 0x201  # Left
     inverter_l_status_task = bus.send_periodic(msg, 0.5)
     time.sleep(0.2)
-    msg.arbitration_id = 0x202              # Right
+    msg.arbitration_id = 0x202  # Right
     inverter_r_status_task = bus.send_periodic(msg, 0.5)
-    '''
 
     while True:
 

@@ -74,12 +74,12 @@ if __name__ == "__main__":
                 print(sensor.type, str(len(sensor.jsonList)))
                 if(len(sensor.jsonList) < maxMessageCount):
                     endParsing = False
-                if(sensor.type in modifiedSensors):
-                    txt = ""
-                    js = sensor.get_dict()
+                    if(sensor.type in modifiedSensors):
+                        txt = ""
+                        js = sensor.get_dict()
 
-                    sensor.jsonList.append(js)
-                    sensor.messageList.append(line)
+                        sensor.jsonList.append(js)
+                        sensor.messageList.append(line)
 
         if(endParsing):
             for sensor in parser.sensors:
