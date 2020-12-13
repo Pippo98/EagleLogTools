@@ -3,13 +3,18 @@
 import re
 import can
 import time
+import signal
 import threading
 
 from browseTerminal import terminalBrowser
 
 bustype = 'socketcan_native'
-channel = 'vcan0'
-bus = can.interface.Bus(channel=channel, bustype=bustype)
+try:
+    channel = 'can0'
+    bus = can.interface.Bus(channel=channel, bustype=bustype)
+except:
+    channel = 'vcan0'
+    bus = can.interface.Bus(channel=channel, bustype=bustype)
 '''
 bus.recv()
 bus.send()
@@ -32,6 +37,13 @@ canMsg = can.Message(arbitration_id=0x0, data=[], is_extended_id=True)
 
 tb = terminalBrowser(startPath="/")
 filename = tb.browse()
+
+
+def quit(_, __):
+    exit(0)
+
+
+signal.signal(signal.SIGINT, quit)
 
 if __name__ == "__main__":
 

@@ -22,15 +22,14 @@ parser = Parser.Parser()
 pp = pprint.PrettyPrinter(depth=4)
 
 bustype = 'socketcan_native'
-channel = 'can0'
-bus = can.interface.Bus(channel=channel, bustype=bustype)
+try:
+    channel = 'can0'
+    bus = can.interface.Bus(channel=channel, bustype=bustype)
+except:
+    channel = 'vcan0'
+    bus = can.interface.Bus(channel=channel, bustype=bustype)
 
-antennaConfig = {
-    "baud": "9600",
-    "channel": "1",
-    "fu": "03",
-    "power": "20"
-}
+antennaConfig = {"baud": "9600", "channel": "1", "fu": "03", "power": "20"}
 
 
 def initializeAntenna():
@@ -96,9 +95,7 @@ def receive(none):
         newMessage = True
 
 
-msg = can.Message(arbitration_id=0x0,
-                  data=[],
-                  is_extended_id=True)
+msg = can.Message(arbitration_id=0x0, data=[], is_extended_id=True)
 
 if __name__ == "__main__":
 
@@ -120,7 +117,7 @@ if __name__ == "__main__":
 
             _dict = {}
             for sensor in parser.sensors:
-                if(sensor.type == "GPS"):
+                if (sensor.type == "GPS"):
                     continue
                 _dict[sensor.type] = (sensor.get_dict())
 

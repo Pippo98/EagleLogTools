@@ -18,8 +18,13 @@ ser = serial.Serial()
 
 # CAN
 bustype = 'socketcan_native'
-channel = 'vcan0'
-bus = can.interface.Bus(channel=channel, bustype=bustype)
+try:
+    channel = 'can0'
+    bus = can.interface.Bus(channel=channel, bustype=bustype)
+except:
+    channel = 'vcan0'
+    bus = can.interface.Bus(channel=channel, bustype=bustype)
+
 toSendMsg = can.Message(arbitration_id=0x0, data=[], is_extended_id=False)
 
 stopGPS = threading.Event()
@@ -119,7 +124,7 @@ def CAN_logger(can, file):
         if message.arbitration_id == 0xA0:
             if payload[0] == 0x65:
                 if payload[1] == 0x00:
-                    print("Stopped")
+                    print("\033[91mStopped")
                     stopTelemetry()
 
         if (time.time() - start_t >= 0.2):
@@ -180,7 +185,7 @@ if __name__ == "__main__":
                 bus.send(toSendMsg)
                 start_t = time.time()
 
-        print("Started")
+        print("\033[96mStarted")
 
         number = getAvailableFilename(logPath)
 

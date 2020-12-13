@@ -12,8 +12,12 @@ lock = threading.Lock()
 STOP_THREADS = threading.Event()
 
 bustype = 'socketcan_native'
-channel = 'vcan0'
-bus = can.interface.Bus(channel=channel, bustype=bustype)
+try:
+    channel = 'can0'
+    bus = can.interface.Bus(channel=channel, bustype=bustype)
+except:
+    channel = 'vcan0'
+    bus = can.interface.Bus(channel=channel, bustype=bustype)
 '''
 bus.recv()
 bus.send()
@@ -37,19 +41,32 @@ steeringMin = True
 map = [0xEC, 20, 40, 60, 80, 100]
 map_idx = 1
 
-lines = [""] * 12
+Telemetry = False
+inTelemetryMenu = False
+menuIdx = 0
+Pilots = ["default", "Ivan", "Filippo", "Mirco", "Nicola", "Davide"]
+Races = ["default", "Autocross", "Skidpad", "Endurance", "Acceleration"]
+Circuits = ["default", "Vadena", "Varano", "Povo"]
+p_i = 0
+r_i = 0
+c_i = 0
+
+lines = [""] * 13
 '''
 using an array to print all car important messages
 
 0 -> ECU
 1 -> BMS
-2 -> Inverter left
-3 -> Inverter right
+2 -> Inverter Left
+3 -> Inverter Right
 4 -> Errors
-
+5
+6 -> Telemetry Status
+7
 8 -> ECU status
 9 -> Sent Messages
 10 -> exceptions
+11 -> telemetryMenu
 '''
 
 help = [
@@ -60,24 +77,30 @@ help = [
     "",
     "'m' To change MAP, each click increases the map sending the message, so PAY ATTENTION",
     "    Sending ERRORS also sends the current map", "",
-    "'s' to set steering wheel calibration MIN-MAX (first press sets MIN, second press sets MAX",
-    "'p' to set throttle calibration MIN-MAX (first press sets MIN, second press sets MAX",
-    "'c' to START-STOP cooling system", "",
-    "'e' to request to ECU errors and warnings",
-    "'i' to request INVERTERS status", "", "'q' to QUIT", ""
+    "'s' To set steering wheel calibration MIN-MAX (first press sets MIN, second press sets MAX",
+    "'p' To set throttle calibration MIN-MAX (first press sets MIN, second press sets MAX",
+    "'c' To START-STOP cooling system", "",
+    "'e' To request to ECU errors and warnings",
+    "'i' To request INVERTERS status", "", "'q' to QUIT", "", "",
+    "'t' To start Telemetry sending CAN message with current config",
+    "'T' To enter in Telemetry menu, use arrows to change current config",
+    "    Left-Right arrows used to change fields",
+    "    Up  -Down  arrows used to change values in fields", ""
 ]
 
-indentLevel = 4
-indentChar = '-'
+indentLevel = 1
+indentChar = "--->"
 
 ecu_idx = 0
 bms_idx = 1
 inverterL_idx = 2
 inverterR_idx = 3
 error_idx = 4
+telemetry_status = 6
 ecu_status_idx = 8
 sent_idx = 9
 exceptions_idx = 10
+telemetry_menu_idx = 11
 
 
 def set_proc_name(newname):
@@ -95,7 +118,7 @@ def updateDisplay():
 
     displayHelp()
     for line in lines:
-        print(indentChar * indentLevel + line + "\r")
+        print(indentChar * indentLevel + " " + line + "\r")
     lock.release()
 
 
@@ -109,8 +132,17 @@ def clearScreen():
     #print(("\033[F" + " " * 150 + "\r") * (len(lines) + len(help) + 1))
 
 
+def updateConf():
+    conf = open(".conf", "w")
+    lines = "{}\n{}\n{}\n".format(p_i, r_i, c_i)
+    conf.write(lines)
+    conf.close()
+
+
 def receive(none):
     global id, payload
+    refreshTime = 0.1
+    startTime = time.time()
     while not STOP_THREADS.is_set():
 
         try:
@@ -132,7 +164,19 @@ def receive(none):
                 if payload[0] == 0x09 and payload[1] == 0x02:
                     lines[bms_idx] = "BMS is OFF Because of SHUTDOWN"
 
-                updateDisplay()
+            #####################################################
+            #####################TELEMETRY#######################
+            #####################################################
+
+            if id == 0x99:
+                if payload[0] == 0:
+                    lines[telemetry_status] = "Telemetry OFF"
+                if payload[0] == 1:
+                    lines[telemetry_status] = "Telemetry ON"
+
+            #####################################################
+            #####################INVERTERS#######################
+            #####################################################
 
             if id == 0x181:
                 if payload[0] == 0xD8:
@@ -140,16 +184,12 @@ def receive(none):
                         lines[inverterL_idx] = "InverterStatus Left OK"
                     else:
                         lines[inverterL_idx] = "InverterStatus Left NOT OK"
-
-                    updateDisplay()
             if id == 0x182:
                 if payload[0] == 0xD8:
                     if payload[2] == 0x0C:
                         lines[inverterR_idx] = "InverterStatus Right OK"
                     else:
                         lines[inverterR_idx] = "InverterStatus Right NOT OK"
-
-                    updateDisplay()
 
             #####################################################
             ########################ECU##########################
@@ -194,29 +234,47 @@ def receive(none):
                     lines[ecu_status_idx] = "Map: {} State: {}\r".format(
                         str(map_), str(state))
 
-                    updateDisplay()
+            if time.time() - startTime >= refreshTime:
+                startTime = time.time()
+                updateDisplay()
+
         except Exception as e:
             lines[exceptions_idx] = str(e)
             updateDisplay()
 
 
 def quit(signal=None, frame=None):
-    clearScreen()
-    print("KILLING THREADS...")
     STOP_THREADS.set()
     t.join()
-    print("DONE")
+    clearScreen()
+    print("KILLED THREADS!")
     print("NOW EXITING")
     exit(0)
 
 
 msg = can.Message(arbitration_id=0x0, data=[], is_extended_id=False)
 
-# signal.signal(signal.SIGINT, quit)
+signal.signal(signal.SIGINT, quit)
 
 set_proc_name(b"steering_sim")
 
 if __name__ == "__main__":
+
+    # initializing telemetry config
+    if os.path.exists(".conf"):
+        conf = open(".conf", "r")
+        indexes = conf.readlines()
+        p_i = int(indexes[0])
+        r_i = int(indexes[1])
+        c_i = int(indexes[2])
+        conf.close()
+    else:
+        conf = open(".conf", "w")
+        conf.writelines(["0\n", "0\n", "0\n"])
+        conf.close()
+
+    lines[telemetry_menu_idx] = "Telemetry Conf: {}-{}-{}".format(
+        Pilots[p_i], Races[r_i], Circuits[c_i])
 
     clearScreen()
 
@@ -248,6 +306,45 @@ if __name__ == "__main__":
             key = click.getchar(False)
         except KeyboardInterrupt:
             quit()
+
+        if inTelemetryMenu:
+            # up arrow
+            if key == "\x1b[A":
+                if menuIdx == 0:
+                    p_i = (p_i + 1) % len(Pilots)
+                if menuIdx == 1:
+                    r_i = (r_i + 1) % len(Races)
+                if menuIdx == 2:
+                    c_i = (c_i + 1) % len(Circuits)
+            # down arrow
+            if key == "\x1b[B":
+                if menuIdx == 0:
+                    p_i = (p_i - 1) if p_i >= 1 else 0
+                if menuIdx == 1:
+                    r_i = (r_i - 1) if r_i >= 1 else 0
+                if menuIdx == 2:
+                    c_i = (c_i - 1) if c_i >= 1 else 0
+            # right arrow
+            if key == "\x1b[C":
+                menuIdx += 1
+                if menuIdx == 3:
+                    inTelemetryMenu = False
+                    menuIdx = 0
+                    lines[
+                        telemetry_menu_idx] = "Telemetry Conf: {}-{}-{}".format(
+                            Pilots[p_i], Races[r_i], Circuits[c_i])
+                    lines[sent_idx] = "Updated Telemetry Conf"
+                    updateConf()
+                    updateDisplay()
+                    continue
+            # left arrow
+            if key == "\x1b[D":
+                menuIdx = (menuIdx - 1) if menuIdx >= 1 else 0
+
+            lines[telemetry_menu_idx] = "Changing Conf: {}-{}-{}".format(
+                Pilots[p_i].upper() if menuIdx == 0 else Pilots[p_i],
+                Races[r_i].upper() if menuIdx == 1 else Races[r_i],
+                Circuits[c_i].upper() if menuIdx == 2 else Circuits[c_i])
 
         # get a char to select which command to send
         if key == "1":
@@ -410,6 +507,30 @@ if __name__ == "__main__":
             lines[sent_idx] += "Sending INVR STATUS REQUEST"
             # Right
             msg.arbitration_id = 0x202
+            bus.send(msg)
+
+        if key == "T":
+            inTelemetryMenu = True
+            lines[sent_idx] = "Setting New Telemetry Config"
+
+        if key == "t":
+
+            if Telemetry == False:
+                msg.dlc = 5
+
+                msg.data = [0x65, 0x01, p_i, r_i, c_i]
+                Telemetry = True
+                lines[sent_idx] = "Sending Telemetry ON: {}-{}-{}".format(
+                    Pilots[p_i], Races[r_i], Circuits[c_i])
+            else:
+                msg.dlc = 2
+
+                msg.data = [0x65, 0x00]
+                Telemetry = False
+                lines[sent_idx] = "Sending Telemetry OFF"
+
+            # Left
+            msg.arbitration_id = 0x0A0
             bus.send(msg)
 
         if key == "q":
