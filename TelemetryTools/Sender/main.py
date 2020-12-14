@@ -12,7 +12,7 @@ import DeviceClasses
 import Parser
 
 import subprocess
-#subprocess.run("chmod 777 /dev/ttyS0")
+subprocess.run("sudo chmod 777 /dev/ttyS0", shell=True)
 
 ###
 
