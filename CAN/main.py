@@ -46,7 +46,7 @@ JSON_TYPE = True
 Pause = False
 ENABLE_MOVIE = False
 
-ENABLE_PRINTING = True
+ENABLE_PRINTING = False
 ENABLE_DISPLAYER = True
 
 #################################################################################
@@ -470,6 +470,7 @@ if __name__ == "__main__":
             if (JSON_TYPE):
                 try:
                     newDict = ast.literal_eval(str(message))
+                    timestamp = time.time() 
                 except Exception as e:
                     # displayer.DebugMessage(message)
                     continue
@@ -485,18 +486,14 @@ if __name__ == "__main__":
         tot_msg += 1
 
         modifiedSensors = []
-        if not TELEMETRY_LOG:
-            if JSON_TYPE:
-                ks = newDict.keys()
-                for sensor in parser.sensors:
-                    if (sensor.type in ks):
-                        sensor.__dict__.update(newDict[sensor.type])
-                        modifiedSensors.append(sensor.type)
-            else:
-                modifiedSensors = parser.parseMessage(timestamp, id, payload)
-
+        if JSON_TYPE:
+            ks = newDict.keys()
+            for sensor in parser.sensors:
+                if (sensor.type in ks):
+                    sensor.__dict__.update(newDict[sensor.type])
+                    modifiedSensors.append(sensor.type)
         else:
-            modifiedSensors = parser.parseCSV(timestamp, id, payload)
+            modifiedSensors = parser.parseMessage(timestamp, id, payload)
 
         ###################################################################
         ########################### ANALYSIS PRINT ########################

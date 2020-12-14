@@ -3,8 +3,9 @@
 #device="pi@192.168.43.131"         ## MY PI4
 #device="ubuntu@192.168.8.102"      ## TELEMETRY pwd telemetrypi
 #device="ubuntu@192.168.8.101"      ## TELEMETRY pwd telemetrypi
+device="ubuntu@192.168.8.100"      ## TELEMETRY pwd telemetrypi
 #device="root@192.168.8.102"         ## STEERING  pwd eaglepi
-device="filippo@192.168.1.180"
+#device="filippo@192.168.1.180"
 
 FOLDERNAME="$(date +"%d-%b-%Y__%H-%M-%S")"
 
