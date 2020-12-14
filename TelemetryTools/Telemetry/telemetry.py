@@ -34,7 +34,7 @@ t_can = None
 t_gps = None
 
 logPath = "/home/ubuntu/logs/"
-logPath = "/home/filippo/Desktop/logs/"
+#logPath = "/home/filippo/Desktop/logs/"
 
 # Config
 Pilots = ["default", "Ivan", "Filippo", "Mirco", "Nicola", "Davide"]
@@ -138,7 +138,7 @@ def CAN_logger(can, file):
 
 
 if __name__ == "__main__":
-    GPS = True
+    GPS = False
 
     set_proc_name(b"TTTTTTT")
     signal.signal(signal.SIGINT, quit)
@@ -147,13 +147,13 @@ if __name__ == "__main__":
         print("Log output directory not correct")
         print("Use an existing one")
         exit(0)
-
-    if find_GPS() != 0:
-        open_device(find_GPS())
-    else:
-        print("no GPS (u-blox) found")
-        print("Not Saving GPS DATA")
-        GPS = False
+    if GPS:
+        if find_GPS() != 0:
+            open_device(find_GPS())
+        else:
+            print("no GPS (u-blox) found")
+            print("Not Saving GPS DATA")
+            GPS = False
 
     canFile = None
     gpsFile = None

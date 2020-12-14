@@ -5,11 +5,14 @@ from serial import Serial
 import time
 import pprint
 
+import threading
+import signal
+
 import DeviceClasses
 import Parser
 
 import subprocess
-subprocess.run("chmod 777 /dev/ttyS0")
+#subprocess.run("chmod 777 /dev/ttyS0")
 
 ###
 
@@ -20,6 +23,10 @@ ser = Serial("/dev/ttyS0", currentBaud)
 parser = Parser.Parser()
 
 pp = pprint.PrettyPrinter(depth=4)
+
+thrd = None
+killThreads = threading.Event()
+mtx = threading.Lock()
 
 bustype = 'socketcan_native'
 try:
@@ -85,23 +92,42 @@ id = 0
 payload = []
 
 
-def receive(none):
-    global id, payload, newMessage
-    while True:
-        message = bus.recv()
+def quit(_,__):
+    killThreads.set()
+    thrd.join()
+    exit(0)
 
-        id = message.arbitration_id
-        payload = message.data
-        newMessage = True
+
+def sendSerial():
+    global id, payload, newMessage
+    while not killThreads.is_set():
+        mtx.acquire()
+        p_sensors = parser.sensors
+        mtx.release()
+        for sensor in p_sensors:
+            _dict = {}
+
+            t = time.time()
+            if (sensor.type == "GPS"):
+                continue
+            _dict[sensor.type] = (sensor.get_dict())
+            ser.write((str(_dict) + "\r\n").encode())
+            pp.pprint(_dict)
+            print(time.time() - t)
 
 
 msg = can.Message(arbitration_id=0x0, data=[], is_extended_id=True)
+
+signal.signal(signal.SIGINT, quit)
 
 if __name__ == "__main__":
 
     previousTime = time.time()
 
     #temp = open("/home/filippo/Desktop/f1.txt", "w")
+
+    thrd = threading.Thread(target=sendSerial)
+    thrd.start()
 
     while True:
         message = bus.recv()
@@ -115,14 +141,16 @@ if __name__ == "__main__":
 
             previousTime = time.time()
 
-            _dict = {}
-            for sensor in parser.sensors:
-                if (sensor.type == "GPS"):
-                    continue
-                _dict[sensor.type] = (sensor.get_dict())
+            #_dict = {}
+            #for sensor in parser.sensors:
+            #    if (sensor.type == "GPS"):
+            #        continue
+            #    _dict[sensor.type] = (sensor.get_dict())
 
-            pp.pprint(_dict)
-            ser.write((str(_dict) + "\r\n").encode())
+            #pp.pprint(_dict)
+            #t = time.time()
+            #ser.write((str(_dict) + "\r\n").encode())
+            #print(time.time()-t)
 
             # before we encode all sensors in a string to be sent in serial
             # now we have to decode that string ad fill each "sensor" with the data contained in the string
