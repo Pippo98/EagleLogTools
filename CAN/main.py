@@ -40,13 +40,13 @@ SIMULATE_STEERING = False
 
 LOG_FILE_MODE = False
 
-VOLANTE_DUMP = False
-JSON_TYPE = True
+VOLANTE_DUMP = True
+JSON_TYPE = False
 
 Pause = False
 ENABLE_MOVIE = False
 
-ENABLE_PRINTING = False
+ENABLE_PRINTING = True
 ENABLE_DISPLAYER = True
 
 #################################################################################
@@ -219,7 +219,7 @@ def parse_message(msg):
         msg = msg.replace("\n", "")
         msg = msg.split("\t")
         if not len(msg) > 2:
-            return
+            return timestamp, id, payload
         timestamp = int(msg[0])
         id = msg[1]
 
@@ -259,7 +259,7 @@ def displaySensors(name, background):
         T = time.time()
 
         if PAUSE_THREADS.isSet():
-            time.sleep(0.002)
+            time.sleep(0.001)
             continue
 
         # Dispaying Image with all data every 0.3 sec
@@ -362,6 +362,10 @@ def createDisplayerRectangles():
                                      height=None,
                                      width=220)
 
+    displayer.addRectangleRelativeTo("sensors", "rawData",
+                                     displayer.Reference.BOTTOM,
+                                     displayer.Alignment.LEFT_RIGHT)
+
 
 signal.signal(signal.SIGINT, quit)
 
@@ -395,14 +399,15 @@ if __name__ == "__main__":
     if (LOG_FILE_MODE):
         fil = open(filename, 'r')
         lines = fil.readlines()[START_LINE:]
-        while parseMessage(lines[0])[0] == None:
+        while parse_message(lines[0])[0] == 0:
             try:
                 lines.pop(0)
             except:
                 quit("LOG FILE WASN'T IN RIGHT FORMAT", "")
-        offset_time = parse_message(lines[START_LINE])[0]
+            print(parse_message(lines[0])[0])
+        offset_time = parse_message(lines[0])[0]
 
-        log_start_time = parse_message(lines[START_LINE])[0]
+        log_start_time = offset_time
         log_end_time = parse_message(lines[-1])[0]
 
     # print("Start analizing CAN messages")
@@ -414,6 +419,7 @@ if __name__ == "__main__":
     payload = None
     newDict = None
     currentLineIdx = 0
+    rawData = []
 
     if ENABLE_PRINTING:
         displayer.initScreen()
@@ -459,6 +465,7 @@ if __name__ == "__main__":
             except IndexError:
                 quit("LOG FILE ENDED", "")
             timestamp, id, payload = parse_message(line)
+            rawData.append(line)
             if (payload == None):
                 continue
 
@@ -466,19 +473,17 @@ if __name__ == "__main__":
                 continue
 
         if (not LOG_FILE_MODE):
-            message = ser.readline().decode("utf-8")
-            if (JSON_TYPE):
-                try:
+            try:
+                message = ser.readline().decode("utf-8")
+                if (JSON_TYPE):
                     newDict = ast.literal_eval(str(message))
-                    timestamp = time.time() 
-                except Exception as e:
-                    # displayer.DebugMessage(message)
-                    continue
-            else:
-                try:
+                    timestamp = time.time()
+                    rawData.append(message)
+                else:
                     timestamp, id, payload = parse_message(message)
-                except:
-                    continue
+                    rawData.append(message)
+            except:
+                continue
 
         if payload == None and not JSON_TYPE:
             continue
@@ -536,7 +541,10 @@ if __name__ == "__main__":
                         .format(currentLineIdx, len(lines),
                                 round(timestamp - offset_time, 3),
                                 round(log_end_time - log_start_time, 3)))
+                if len(rawData) > 0:
+                    displayer.writeLines("rawData", rawData, 0)
                 displayer.refresh()
+                rawData.clear()
 
         ###################################################################
         ############################# UI THREAD ###########################

@@ -6,15 +6,34 @@ import datetime
 import threading
 
 # GPS
+import pty
 import serial
 import serial.tools.list_ports as lst
 
 # CANDUMP
 import can
 
+FORWARD_GPS = False
+
 # GPS
 info = lst.comports()
 ser = serial.Serial()
+
+if FORWARD_GPS:
+    master, slave = pty.openpty()
+    master = os.ttyname(master)
+    slave = os.ttyname(slave)
+    print(master, slave)
+    virtual_ser = serial.Serial()
+    virtual_ser.port = master
+    virtual_ser.baudrate = 115200
+    virtual_ser.open()
+
+    while True:
+        time.sleep(0.2)
+        virtual_ser.write(b"hola\r\n")
+        virtual_ser.flushOutput()
+    #virtual_ser.open()
 
 # CAN
 bustype = 'socketcan_native'
@@ -33,8 +52,8 @@ stopCAN = threading.Event()
 t_can = None
 t_gps = None
 
-logPath = "/home/ubuntu/logs/"
-#logPath = "/home/filippo/Desktop/logs/"
+#logPath = "/home/ubuntu/logs/"
+logPath = "/home/filippo/Desktop/logs/"
 
 # Config
 Pilots = ["default", "Ivan", "Filippo", "Mirco", "Nicola", "Davide"]
@@ -83,14 +102,15 @@ def open_device(dev):
     ser.port = dev
     ser.baudrate = 2250000
     ser.open()
-    ser.readline()
 
 
 def GPS_logger(ser, file):
     while not stopGPS.is_set():
         msg = ser.readline().decode("utf-8")
-        msg = str(time.time()) + "\t" + msg
-        file.write(msg)
+        line = str(time.time()) + "\t" + msg
+        file.write(line)
+        if FORWARD_GPS:
+            virtual_ser.write(msg)
 
     file.close()
     ser.close()
