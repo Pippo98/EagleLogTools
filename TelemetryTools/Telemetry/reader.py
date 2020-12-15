@@ -15,11 +15,10 @@ FORWARD_GPS = True
 if FORWARD_GPS:
 
     #master, slave = pty.openpty()
-    res = os.open("/dev/pts/2", os.O_RDWR)
+    term = open("/dev/pts/3", "rb", buffering=0)
     # virtual_ser = serial.Serial()
     # virtual_ser.port = "/dev/pts/2"
     # virtual_ser.baudrate = 115200
     # virtual_ser.open()
     while True:
-        os.read(master, 1024)
-    #virtual_ser.open()
+        print(term.read(1).decode())

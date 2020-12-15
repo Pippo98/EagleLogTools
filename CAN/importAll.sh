@@ -20,8 +20,8 @@ echo $FOLDERNAME
 
 
 ssh $device "
-cd ~/Desktop/logs &&
+cd ~/logs &&
 zip $FOLDERNAME'.zip' *.log &&
 rm *.log"
 
-scp $device:~/Desktop/logs/$FOLDERNAME'.zip' /home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER
+scp $device:~/logs/$FOLDERNAME'.zip' /home/filippo/Desktop/CANDUMP_DEFAULT_FOLDER

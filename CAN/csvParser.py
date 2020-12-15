@@ -19,7 +19,6 @@ from Display_Car import *
 from telemetryParser import *
 from browseTerminal import terminalBrowser
 
-
 parser = Parser.Parser()
 
 VOLANTE_DUMP = True
@@ -32,17 +31,17 @@ def findAllFiles(path, extension):
     dirs = os.listdir(path)
     paths = []
     for dir in dirs:
-        if(os.path.isdir(path + "/" + dir)):
+        if (os.path.isdir(path + "/" + dir)):
             paths += findAllFiles(path + "/" + dir, extension)
         else:
-            if(extension in dir):
+            if (extension in dir):
                 paths.append(path + "/" + dir)
     return paths
 
 
 def selectCandumpPaths(paths):
     selection = []
-    tries = 10
+    tries = 20
 
     for path in paths:
         f = open(path, "r")
@@ -106,7 +105,7 @@ def parse_message(msg):
             timestamp = (float(msg[0].replace("(", "").replace(")", "")))
             id = (int(msg[2].split("#")[0], 16))
             for i in range(0, len(msg[2].split("#")[1]), 2):
-                payload.append((int(msg[2].split("#")[1][i:i+2], 16)))
+                payload.append((int(msg[2].split("#")[1][i:i + 2], 16)))
         except:
             return timestamp, id, None
     else:
@@ -168,14 +167,14 @@ if __name__ == "__main__":
     paths = findAllFiles(basePath, ".log")
     print("Found {} files".format(len(paths)))
 
-    if(PARSE_DUMP):
+    if (PARSE_DUMP):
 
         dump = selectCandumpPaths(paths)
         print("Found {} CANDUMP files".format(len(dump)))
 
-        print("#"*100)
-        print("#"*100)
-        print("#"*100)
+        print("#" * 100)
+        print("#" * 100)
+        print("#" * 100)
         print("START PARSING DUMP")
 
         # parse each file and create csv
@@ -198,7 +197,8 @@ if __name__ == "__main__":
                 sensor.file_.write(csvDescriptorLine)
 
             # parse each line and create CSV
-            for line in tqdm(lines, "PARSING {}".format(path.replace(basePath, ""))):
+            for line in tqdm(lines,
+                             "PARSING {}".format(path.replace(basePath, ""))):
                 try:
                     timestamp, id, payload = parse_message(line)
                     modifiedSensors = parser.parseMessage(
@@ -209,7 +209,7 @@ if __name__ == "__main__":
                     continue
 
                 for sensor in parser.sensors:
-                    if(sensor.type in modifiedSensors):
+                    if (sensor.type in modifiedSensors):
                         txt = ""
                         obj, names = sensor.get_obj()
                         csvline = str(sensor.time) + ";"
@@ -219,14 +219,14 @@ if __name__ == "__main__":
 
         print("DONE\n\n")
 
-    if(PARSE_GPS):
+    if (PARSE_GPS):
 
         GPS = selectGPSPaths(paths)
         print("Found {} GPS files".format(len(GPS)))
 
-        print("#"*100)
-        print("#"*100)
-        print("#"*100)
+        print("#" * 100)
+        print("#" * 100)
+        print("#" * 100)
         print("START PARSING GPS")
 
         for path in GPS:
@@ -238,13 +238,14 @@ if __name__ == "__main__":
             # create or choose the folder in which save CSV files
             folder, created = getCSVFolder(path)
 
-            parser.gps.file_ = open(
-                folder + "/" + parser.gps.type + ".csv", "w")
+            parser.gps.file_ = open(folder + "/" + parser.gps.type + ".csv",
+                                    "w")
             obj, names = parser.gps.get_obj()
             csvDescriptorLine = "timestamp" + ";" + ";".join(names) + "\n"
             parser.gps.file_.write(csvDescriptorLine)
 
-            for line in tqdm(lines, "PARSING {}".format(path.replace(basePath, ""))):
+            for line in tqdm(lines,
+                             "PARSING {}".format(path.replace(basePath, ""))):
                 timestamp, type, data = parse_GPS(line)
 
                 if timestamp == None or type == None or data == None:
@@ -262,7 +263,7 @@ if __name__ == "__main__":
 
         print("DONE\n\n")
 
-    if(COMPRESS):
+    if (COMPRESS):
         toZipPaths = findAllFiles(basePath, ".csv")
 
         toZipPaths = list(dict.fromkeys(toZipPaths))

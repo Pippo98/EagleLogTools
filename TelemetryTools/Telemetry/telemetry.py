@@ -13,27 +13,24 @@ import serial.tools.list_ports as lst
 # CANDUMP
 import can
 
-FORWARD_GPS = False
+FORWARD_GPS = True
 
 # GPS
 info = lst.comports()
 ser = serial.Serial()
-
+'''
 if FORWARD_GPS:
-    master, slave = pty.openpty()
-    master = os.ttyname(master)
-    slave = os.ttyname(slave)
-    print(master, slave)
-    virtual_ser = serial.Serial()
-    virtual_ser.port = master
-    virtual_ser.baudrate = 115200
-    virtual_ser.open()
+
+    term = open("/dev/ptmx", "wb", buffering=0)
+
+    term.write("hola\r\n".encode())
 
     while True:
-        time.sleep(0.2)
-        virtual_ser.write(b"hola\r\n")
-        virtual_ser.flushOutput()
+        term.write("hola\r\n".encode())
+        time.sleep(0.5)
+        print("sent")
     #virtual_ser.open()
+'''
 
 # CAN
 bustype = 'socketcan_native'
@@ -109,8 +106,8 @@ def GPS_logger(ser, file):
         msg = ser.readline().decode("utf-8")
         line = str(time.time()) + "\t" + msg
         file.write(line)
-        if FORWARD_GPS:
-            virtual_ser.write(msg)
+        # if FORWARD_GPS:
+        #     virtual_ser.write(msg)
 
     file.close()
     ser.close()
