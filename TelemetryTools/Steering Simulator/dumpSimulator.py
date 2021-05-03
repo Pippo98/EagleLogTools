@@ -51,7 +51,7 @@ if __name__ == "__main__":
     count = 0
     while True:
         f = open(filename, "r")
-        lines = f.readlines()
+        lines = f.readlines()[30:]
 
         for e in lines:
             id = 0

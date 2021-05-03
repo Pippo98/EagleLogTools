@@ -13,6 +13,8 @@ from tqdm import tqdm
 import serial.tools.list_ports as lst
 from termcolor import colored, cprint
 
+import scipy.io
+
 import Parser
 import DeviceClasses
 from Display_Car import *
@@ -22,9 +24,11 @@ from browseTerminal import terminalBrowser
 parser = Parser.Parser()
 
 VOLANTE_DUMP = True
-PARSE_DUMP = True
+PARSE_DUMP = False
 PARSE_GPS = True
 COMPRESS = True
+
+# /media/filippo/label/Codes/Github/EagleLogTools/CAN
 
 
 def findAllFiles(path, extension):
@@ -113,7 +117,7 @@ def parse_message(msg):
         msg = msg.split("\t")
         if not len(msg) > 2:
             return
-        timestamp = int(msg[0])
+        timestamp = float(msg[0])
         id = msg[1]
 
         for e in msg[2:]:
@@ -131,7 +135,7 @@ def parse_GPS(line):
     if not len(sline) > 1:
         return None, None, None
 
-    timestamp = sline[0]
+    timestamp = float(sline[0])
 
     payload = sline[1].split(",")
 
@@ -196,7 +200,16 @@ if __name__ == "__main__":
                 csvDescriptorLine = "timestamp" + ";" + ";".join(names) + "\n"
                 sensor.file_.write(csvDescriptorLine)
 
-            # parse each line and create CSV
+                # Mat section
+                sensor.file_2 = folder + "/" + sensor.type
+                sensor.jsonList = {}
+                sensor.jsonList["timestamp"] = []
+                for name in names:
+                    sensor.jsonList[name] = []
+
+            data = []
+            # parse each line and if that line contained sensors data,
+            # write the right file with those parsed values
             for line in tqdm(lines,
                              "PARSING {}".format(path.replace(basePath, ""))):
                 try:
@@ -213,9 +226,25 @@ if __name__ == "__main__":
                         txt = ""
                         obj, names = sensor.get_obj()
                         csvline = str(sensor.time) + ";"
+                        sensor.jsonList["timestamp"].append([sensor.time])
                         for i, e in enumerate(obj):
                             csvline += str(e) + ";"
+
+                            # .mat section
+                            sensor.jsonList[names[i]].append([e])
+
                         sensor.file_.write(csvline + "\n")
+
+            # mat section
+            for sensor in parser.sensors:
+
+                if sensor.type == "SteeringWheel" or sensor.type == "ECU":
+                    continue
+
+                for key in sensor.jsonList.keys():
+                    sensor.jsonList[key] = np.array(sensor.jsonList[key])
+
+                scipy.io.savemat(sensor.file_2 + '.mat', sensor.jsonList)
 
         print("DONE\n\n")
 
@@ -244,6 +273,13 @@ if __name__ == "__main__":
             csvDescriptorLine = "timestamp" + ";" + ";".join(names) + "\n"
             parser.gps.file_.write(csvDescriptorLine)
 
+            # Mat section
+            parser.gps.file_2 = folder + "/" + parser.gps.type
+            parser.gps.jsonList = {}
+            parser.gps.jsonList["timestamp"] = []
+            for name in names:
+                parser.gps.jsonList[name] = []
+
             for line in tqdm(lines,
                              "PARSING {}".format(path.replace(basePath, ""))):
                 timestamp, type, data = parse_GPS(line)
@@ -257,14 +293,22 @@ if __name__ == "__main__":
                     txt = ""
                     obj, names = parser.gps.get_obj()
                     csvline = str(parser.gps.time) + ";"
+                    parser.gps.jsonList["timestamp"].append([parser.gps.time])
                     for i, e in enumerate(obj):
                         csvline += str(e) + ";"
+                        # .mat section
+                        parser.gps.jsonList[names[i]].append([e])
                     parser.gps.file_.write(csvline + "\n")
+
+            for key in parser.gps.jsonList.keys():
+                parser.gps.jsonList[key] = np.array(parser.gps.jsonList[key])
+
+            scipy.io.savemat(parser.gps.file_2 + '.mat', parser.gps.jsonList)
 
         print("DONE\n\n")
 
     if (COMPRESS):
-        toZipPaths = findAllFiles(basePath, ".csv")
+        toZipPaths = findAllFiles(basePath, ".mat")
 
         toZipPaths = list(dict.fromkeys(toZipPaths))
 

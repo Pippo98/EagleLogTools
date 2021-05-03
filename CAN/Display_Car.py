@@ -29,6 +29,17 @@ rectanglesIDS = [
 
 rectangles = {}
 
+sTime = 0
+
+
+def start():
+    global sTime
+    sTime = time.time()
+
+
+def end():
+    return (time.time() - sTime) * 1000
+
 
 def getCenter(ul, br):
     center = (int((abs(br[0] - ul[0]) / 2) + ul[0]),
@@ -322,6 +333,7 @@ def rounded_rectangle(src,
 
 
 def display_accel(image, type, accel):
+    start()
     pointcolor = (0, 0, 255, 255)
     white = (255, 255, 255, 255)
 
@@ -347,7 +359,7 @@ def display_accel(image, type, accel):
     for i in range(1, max_accel):
         cv2.ellipse(image, center, (int(i * scl), int(i * scl)), 0, 0, 359,
                     white, 1, cv2.LINE_AA)
-
+    print(end())
     return image
 
 

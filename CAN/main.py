@@ -47,7 +47,7 @@ Pause = False
 ENABLE_MOVIE = False
 
 ENABLE_PRINTING = True
-ENABLE_DISPLAYER = True
+ENABLE_DISPLAYER = False
 
 #################################################################################
 
@@ -241,7 +241,6 @@ def start():
 
 
 def end():
-    global sTime
     return (time.time() - sTime) * 1000
 
 
