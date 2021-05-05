@@ -51,8 +51,6 @@ if len(lines) > 1:
   print("-"*10)
   print("start:\r\n\t{}\nend:\r\n\t{}\nrotations:\r\n\t{}\nKm:\r\n\t{}".format(runStartTime, runEndTime, rotations, km))
   print("-"*10)
-else:
-  status.write("start;end;rotations;km;\n")
 
 prev_rotations = rotations
 km = 0

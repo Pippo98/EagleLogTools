@@ -13,6 +13,7 @@ import serial.tools.list_ports as lst
 # CANDUMP
 import can
 
+GPS = False
 FORWARD_GPS = True
 
 # GPS
@@ -38,8 +39,13 @@ try:
     channel = 'can0'
     bus = can.interface.Bus(channel=channel, bustype=bustype)
 except:
-    channel = 'vcan0'
-    bus = can.interface.Bus(channel=channel, bustype=bustype)
+    try:
+      channel = 'vcan0'
+      bus = can.interface.Bus(channel=channel, bustype=bustype)
+    except:
+      print("No CAN bus detected")
+      exit(0)
+
 
 toSendMsg = can.Message(arbitration_id=0x0, data=[], is_extended_id=False)
 
@@ -89,9 +95,6 @@ def find_GPS():
     for port in info:
         if (port.product.find("u-blox") != -1):
             return port.device
-    # for port in info:
-    #     if (port.product.find("Pyboard") != -1):
-    #         return port.device
     return 0
 
 
@@ -138,7 +141,7 @@ def CAN_logger(can, file):
         line = "({:.6f}) {} {}#{}\r\n".format(t, "can0", id, payString)
         file.write(line)
 
-        if message.arbitration_id == 0xA0:
+        if message.arbitration_id == 0xA0 and len(payload) >= 2:
             if payload[0] == 0x65:
                 if payload[1] == 0x00:
                     print("\033[91mStopped")
@@ -155,13 +158,13 @@ def CAN_logger(can, file):
 
 
 if __name__ == "__main__":
-    GPS = False
-
+    
     set_proc_name(b"TTTTTTT")
     signal.signal(signal.SIGINT, quit)
 
     if not os.path.exists(logPath):
-        print("Log output directory not correct")
+        print("Log directory: {}".format(logPath))
+        print("Log output directory not found")
         print("Use an existing one")
         exit(0)
     if GPS:
@@ -181,13 +184,14 @@ if __name__ == "__main__":
 
     start_t = time.time()
     while True:
+        bus.set_filters([{"can_id":0xA0, "can_mask":0b11111111111, "extended":False}])
         while True:
             message = bus.recv()
 
             id = message.arbitration_id
             payload = message.data
 
-            if id == 0xA0:
+            if id == 0xA0 and len(payload) >= 2:
                 if payload[0] == 0x65 and payload[1] == 0x01:
                     if len(payload) >= 5:
                         pilot = Pilots[payload[2]]
@@ -201,6 +205,8 @@ if __name__ == "__main__":
 
                 bus.send(toSendMsg)
                 start_t = time.time()
+
+        bus.set_filters(filters=None)
 
         print("\033[96mStarted")
 
@@ -238,3 +244,7 @@ if __name__ == "__main__":
 
         stopCAN.clear()
         stopGPS.clear()
+
+        canFile.close()
+        if GPS:
+          gpsFile.close()
